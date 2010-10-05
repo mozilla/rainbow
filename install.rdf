@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<r:RDF xmlns="http://www.mozilla.org/2004/em-rdf#"
+       xmlns:r="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <r:Description about="urn:mozilla:install-manifest">
+    <creator>Mozilla Labs</creator>
+    <description>An Audio-Visual Experiment in the Browser</description>
+    <homepageURL>https://mozillalabs.com/</homepageURL>
+    <iconURL>https://mozillalabs.com/wp-content/themes/labs_project/img/default-header.png</iconURL>
+    <id>rainbow@labs.mozilla</id>
+
+    <name>Mozilla Labs: Rainbow</name>
+    <version>0.0.1</version>
+
+    <bootstrap>true</bootstrap>
+    <type>2</type>
+
+    <targetApplication>
+      <r:Description>
+        <id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
+        <minVersion>4.0b6</minVersion>
+        <maxVersion>4.0b8pre</maxVersion>
+      </r:Description>
+    </targetApplication>
+  </r:Description>
+</r:RDF>
