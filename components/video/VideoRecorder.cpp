@@ -45,15 +45,15 @@ VideoRecorder *
 VideoRecorder::GetSingleton()
 {
     if (gVideoRecordingService) {
-        NS_ADDREF(gVideoRecordingService);
+        gVideoRecordingService->AddRef();
         return gVideoRecordingService;
     }
     
     gVideoRecordingService = new VideoRecorder();
     if (gVideoRecordingService) {
-        NS_ADDREF(gVideoRecordingService);
+        gVideoRecordingService->AddRef();
         if (NS_FAILED(gVideoRecordingService->Init()))
-            NS_RELEASE(gVideoRecordingService);
+            gVideoRecordingService->Release();
     }
     
     return gVideoRecordingService;
@@ -175,6 +175,7 @@ int
 VideoRecorder::RecordToFileCallback(vidcap_src *src, void *data,
     struct vidcap_capture_info *video)
 {
+	nsresult rv;
     ogg_page og;
     ogg_packet op;
     th_ycbcr_buffer ycbcr;
@@ -215,32 +216,17 @@ VideoRecorder::RecordToFileCallback(vidcap_src *src, void *data,
             fwrite(og.body, og.body_len, 1, vr->outfile);
         }
         
-        if (vr->mCtx && vr->mThebes) {
+        if (vr->mCtx) {
             unsigned char *rgb = (unsigned char *)
                 PR_Calloc(1, WIDTH * HEIGHT * 4);
             vidcap_i420_to_rgb32(
                 WIDTH, HEIGHT,
                 (const char *)yuv, (char *)rgb
             );
-            nsRefPtr<gfxImageSurface> img = new gfxImageSurface(
-                rgb, gfxIntSize(WIDTH, HEIGHT),
-                WIDTH * 4, gfxASurface::ImageFormatARGB32
-            );
-            if (!img || img->CairoStatus()) {
-                fprintf(stderr, "Could not setup gfxSurface!\n");
-            } else {
-                gfxContextPathAutoSaveRestore pathSR(vr->mThebes);
-                gfxContextAutoSaveRestore autoSR(vr->mThebes);
-                // ignore clipping region, as per spec
-                vr->mThebes->ResetClip();
-                vr->mThebes->IdentityMatrix();
-                vr->mThebes->Translate(gfxPoint(0, 0));
-                vr->mThebes->NewPath();
-                vr->mThebes->Rectangle(gfxRect(0, 0, WIDTH, HEIGHT));
-                vr->mThebes->SetSource(img, gfxPoint(0, 0));
-                vr->mThebes->SetOperator(gfxContext::OPERATOR_SOURCE);
-                vr->mThebes->Fill();
-            }
+			
+			rv = vr->mCtx->PutImageData_explicit(
+				0, 0, WIDTH, HEIGHT, rgb, WIDTH * HEIGHT * 4
+			);
             PR_Free((void *)rgb);
         }
         
@@ -383,13 +369,7 @@ VideoRecorder::StartRecordToFile(
     
     /* Acquire surface for callback */
     if (ctx) {
-        gfxASurface **surface =
-            (gfxASurface **)PR_Malloc(sizeof(gfxASurface *));
-        mCtx = do_QueryInterface(ctx);
-        mCtx->GetThebesSurface(surface);
-        if (*surface != nsnull)
-            mThebes = new gfxContext(*surface);
-        PR_Free(surface);
+        mCtx = ctx;
     }
     
     /* Start recording */

@@ -58,45 +58,40 @@ headers = -I. \
           -I$(sdkdir)/include \
           -I$(sdkdir)/include/system_wrappers \
           -I$(sdkdir)/include/xpcom \
-					-I$(sdkdir)/include/gfx \
+		  -I$(sdkdir)/include/gfx \
           -I$(sdkdir)/include/string \
-					-I$(sdkdir)/include/content \
-					-I$(sdkdir)/include/dom \
+		  -I$(sdkdir)/include/content \
+		  -I$(sdkdir)/include/dom \
           -I$(sdkdir)/include/nspr \
-					-I$(sdkdir)/include/thebes \
+		  -I$(sdkdir)/include/thebes \
           -I$(sdkdir)/sdk/include \
-          -I/usr/local/vidcap/include \
-          -I/usr/local/theora/include
+          -I/opt/local/include
 
 # libraries
 libdirs := $(sdkdir)/lib $(sdkdir)/bin
-libs := xpcomglue_s xpcom nspr4 \
-        thebes plds4 plc4
+libs := xpcomglue_s xpcom nspr4 plds4 plc4
 
 # compiler and Linker Flags
 ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
-  headers += -I/usr/local/libvidcap/include/vidcap
   cppflags += -c -pipe -Os -arch i386 \
               -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
               -fno-common -fshort-wchar -fpascal-strings -pthread \
               -Wall -Wconversion -Wpointer-arith -Woverloaded-virtual \
-							-Wsynth -Wno-ctor-dtor-privacy -Wno-non-virtual-dtor \
-							-Wcast-align -Wno-long-long \
+			  -Wsynth -Wno-ctor-dtor-privacy -Wno-non-virtual-dtor \
+			  -Wcast-align -Wno-long-long \
               -include xpcom-config.h $(headers)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              -Wl,-exported_symbol \
-              -Wl,_NSGetModule \
-              /usr/local/vidcap/lib/libvidcap.a \
-              /usr/local/theora/lib/libogg.a \
-              /usr/local/theora/lib/libtheora.a \
-              /usr/local/theora/lib/libtheoraenc.a \
-							-framework Carbon \
-							-framework QuartzCore \
-							-framework QuickTime \
+              /opt/local/lib/libvidcap.a \
+              /opt/local/lib/libogg.a \
+              /opt/local/lib/libtheora.a \
+              /opt/local/lib/libtheoraenc.a \
+			  -framework Carbon \
+			  -framework QuartzCore \
+			  -framework QuickTime \
               $(libdirs) $(libs)
 endif
 

@@ -36,20 +36,30 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsIGenericFactory.h"
 #include "VideoRecorder.h"
+#include "mozilla/ModuleUtils.h"
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(VideoRecorder,
-                                         VideoRecorder::GetSingleton)
+	VideoRecorder::GetSingleton)
 
-static nsModuleComponentInfo components[] =
-{
-  {
-    VIDEO_RECORDER_CLASSNAME,
-    VIDEO_RECORDER_CID,
-    VIDEO_RECORDER_CONTRACTID,
-    VideoRecorderConstructor,
-  }
+NS_DEFINE_NAMED_CID(VIDEO_RECORDER_CID);
+
+static const mozilla::Module::CIDEntry kVideoCIDs[] = {
+	{ &kVIDEO_RECORDER_CID, false, NULL, VideoRecorderConstructor },
+	{ NULL }
 };
 
-NS_IMPL_NSGETMODULE(nsJetpackVideo, components) 
+static const mozilla::Module::ContractIDEntry kVideoContracts[] = {
+	{ VIDEO_RECORDER_CONTRACTID, &kVIDEO_RECORDER_CID },
+	{ NULL }
+};
+
+static const mozilla::Module VideoRecorderModule = {
+ 	mozilla::Module::kVersion,
+	kVideoCIDs,
+	kVideoContracts,
+	NULL   
+};
+
+NSMODULE_DEFN(nsVideoRecorder) = &VideoRecorderModule;
+

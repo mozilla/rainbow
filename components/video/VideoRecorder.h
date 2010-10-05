@@ -47,26 +47,21 @@
 #include <theora/theoraenc.h>
 
 #include "prmem.h"
-#include "gfxContext.h"
-#include "gfxPattern.h"
-#include "gfxASurface.h"
-#include "gfxImageSurface.h"
+#include "nsMemory.h"
 #include "nsStringAPI.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
-#include "nsComponentManagerUtils.h"
-#include "nsICanvasRenderingContextInternal.h"
+#include "nsIDOMCanvasRenderingContext2D.h"
 
 #define VIDEO_RECORDER_CONTRACTID "@labs.mozilla.com/video/recorder;1"
-#define VIDEO_RECORDER_CLASSNAME  "Video Recording Capability"
 #define VIDEO_RECORDER_CID { 0xb3ee26b3, 0xe935, 0x4c56, \
                            { 0x83, 0xa1, 0x5e, 0x88, 0x55, 0xd7, 0x11, 0x4b }}
 
 
-#define WIDTH 640
-#define HEIGHT 480
-#define FPS_N 15
-#define FPS_D 1
+#define WIDTH	640
+#define HEIGHT	480
+#define FPS_N	15
+#define FPS_D	1
 
 class VideoRecorder : public IVideoRecorder
 {
@@ -91,10 +86,9 @@ private:
     ogg_stream_state *ogg_state;
     
     struct vidcap_src_info *sources;
+    nsIDOMCanvasRenderingContext2D *mCtx;
     static VideoRecorder *gVideoRecordingService;
-    
-    nsRefPtr<gfxContext> mThebes;
-    nsCOMPtr<nsICanvasRenderingContextInternal> mCtx;
+
 protected:
     nsresult SetupOggTheora(nsACString& file);
     static int RecordToFileCallback(vidcap_src *src,
