@@ -1,0 +1,3 @@
+interfaces components/video/IVideoRecorder.xpt
+binary-component components/video/libjetpackvideo.dylib ABI=Darwin_x86-gcc3
+#contract @labs.mozilla.com/video/recorder;1 {b3ee26b3-e935-4c56-83a1-5e8855d7114b}

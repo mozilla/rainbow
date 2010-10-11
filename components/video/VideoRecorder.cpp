@@ -142,7 +142,7 @@ MakeRandomString(char *buf, PRInt32 bufLen)
     PRInt32 i;
     for (i=0;i<bufLen;i++) {
         *buf++ = table[rand()%TABLE_SIZE];
-    }
+	}
     *buf = 0;
 }
 
@@ -172,7 +172,7 @@ EscapeBackslash(nsACString& str)
 }
 
 int
-VideoRecorder::RecordToFileCallback(vidcap_src *src, void *data,
+VideoRecorder::Callback(vidcap_src *src, void *data,
     struct vidcap_capture_info *video)
 {
 	nsresult rv;
@@ -347,7 +347,7 @@ VideoRecorder::SetupOggTheora(nsACString& file)
  * Start recording to file
  */
 NS_IMETHODIMP
-VideoRecorder::StartRecordToFile(
+VideoRecorder::Start(
     nsIDOMCanvasRenderingContext2D *ctx,
     nsACString &file
 )
@@ -385,7 +385,7 @@ VideoRecorder::StartRecordToFile(
 		return NS_ERROR_FAILURE;
 	}
 	
-	if (vidcap_src_capture_start(source, this->RecordToFileCallback, this)) {
+	if (vidcap_src_capture_start(source, VideoRecorder::Callback, this)) {
 		fprintf(stderr, "Failed vidcap_src_capture_start()\n");
 		return NS_ERROR_FAILURE;
 	}

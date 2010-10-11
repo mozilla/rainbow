@@ -91,7 +91,7 @@ private:
 
 protected:
     nsresult SetupOggTheora(nsACString& file);
-    static int RecordToFileCallback(vidcap_src *src,
+    static int Callback(vidcap_src *src,
 	    void *data, struct vidcap_capture_info *video);
 };
 

@@ -11,7 +11,8 @@
     <name>Mozilla Labs: Rainbow</name>
     <version>0.0.1</version>
 
-    <bootstrap>true</bootstrap>
+    <!--<bootstrap>true</bootstrap>
+	<unpack>true</unpack>-->
     <type>2</type>
 
     <targetApplication>

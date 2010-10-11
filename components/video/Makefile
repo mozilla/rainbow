@@ -6,7 +6,7 @@ ifeq ($(sys), Darwin)
   compiler = gcc
   cxx = g++
   so = dylib
-  cppflags += -dynamiclib -DDEBUG
+  cppflags += -dynamiclib -DDEBUG -DMOZ_NO_MOZALLOC
 else
   $(error Sorry, your os is unknown/unsupported: $(sys))
 endif
@@ -58,12 +58,10 @@ headers = -I. \
           -I$(sdkdir)/include \
           -I$(sdkdir)/include/system_wrappers \
           -I$(sdkdir)/include/xpcom \
-		  -I$(sdkdir)/include/gfx \
           -I$(sdkdir)/include/string \
 		  -I$(sdkdir)/include/content \
 		  -I$(sdkdir)/include/dom \
           -I$(sdkdir)/include/nspr \
-		  -I$(sdkdir)/include/thebes \
           -I$(sdkdir)/sdk/include \
           -I/opt/local/include
 

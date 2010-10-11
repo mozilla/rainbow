@@ -35,7 +35,38 @@
  * ***** END LICENSE BLOCK ***** */
 
 const Cu = Components.utils;
-Cu.import("resource://gre/modules/AddonManager.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+const Cc = Components.classes;
+const Cm = Components.manager;
+const Ci = Components.interfaces;
+
+function startup(data, reason)
+{
+	let cr = Cm.QueryInterface(Ci.nsIComponentRegistrar);
+	let pt = data.installPath.path;
+
+	let fi = Cc["@mozilla.org/file/local;1"]
+				.createInstance(Ci.nsILocalFile);
+	fi.initWithPath(pt);
+	
+	/*
+	fi.append("components");
+	fi.append("video");
+	fi.append("libjetpackvideo.dylib");
+	*/
+
+	/* FIXME: This is MAC ONLY! i386 ONLY! WTB more cross-platformyness! */
+	let cr = Cm.QueryInterface(Ci.nsIComponentRegistrar);
+	cr.autoRegister(fi);
+
+	dump(cr.isContractIDRegistered("@labs.mozilla.com/video/recorder;1"));
+
+	//let cid = "@labs.mozilla.com/video/recorder;1";
+	//let vid = Cm.getClassObjectByContractID(cid, Ci.nsISupports);
+	//dump(vid+"\n");
+}
+
+function shutdown(data, reason)
+{
+	dump("bye!\n");
+}
 
