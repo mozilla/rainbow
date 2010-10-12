@@ -40,25 +40,25 @@
 #include "mozilla/ModuleUtils.h"
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(VideoRecorder,
-	VideoRecorder::GetSingleton)
+    VideoRecorder::GetSingleton)
 
 NS_DEFINE_NAMED_CID(VIDEO_RECORDER_CID);
 
 static const mozilla::Module::CIDEntry kVideoCIDs[] = {
-	{ &kVIDEO_RECORDER_CID, false, NULL, VideoRecorderConstructor },
-	{ NULL }
+    { &kVIDEO_RECORDER_CID, false, NULL, VideoRecorderConstructor },
+    { NULL }
 };
 
 static const mozilla::Module::ContractIDEntry kVideoContracts[] = {
-	{ VIDEO_RECORDER_CONTRACTID, &kVIDEO_RECORDER_CID },
-	{ NULL }
+    { VIDEO_RECORDER_CONTRACTID, &kVIDEO_RECORDER_CID },
+    { NULL }
 };
 
 static const mozilla::Module VideoRecorderModule = {
- 	mozilla::Module::kVersion,
-	kVideoCIDs,
-	kVideoContracts,
-	NULL   
+    mozilla::Module::kVersion,
+    kVideoCIDs,
+    kVideoContracts,
+    NULL   
 };
 
 NSMODULE_DEFN(nsVideoRecorder) = &VideoRecorderModule;

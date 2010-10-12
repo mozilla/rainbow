@@ -47,10 +47,15 @@
 #include <theora/theoraenc.h>
 
 #include "prmem.h"
-#include "nsMemory.h"
+#include "prthread.h"
+
+#include "nsIPipe.h"
 #include "nsStringAPI.h"
+#include "nsIAsyncInputStream.h"
+#include "nsIAsyncOutputStream.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
+#include "nsComponentManagerUtils.h"
 #include "nsIDOMCanvasRenderingContext2D.h"
 
 #define VIDEO_RECORDER_CONTRACTID "@labs.mozilla.com/video/recorder;1"
@@ -58,10 +63,10 @@
                            { 0x83, 0xa1, 0x5e, 0x88, 0x55, 0xd7, 0x11, 0x4b }}
 
 
-#define WIDTH	640
-#define HEIGHT	480
-#define FPS_N	15
-#define FPS_D	1
+#define WIDTH   640
+#define HEIGHT  480
+#define FPS_N   10
+#define FPS_D   1
 
 class VideoRecorder : public IVideoRecorder
 {
@@ -78,21 +83,26 @@ private:
     int size;
     int recording;
     FILE *outfile;
-    
+    PRThread *encthr;
+
     vidcap_sapi *sapi;
     vidcap_src *source;
     vidcap_state *state;
     th_enc_ctx *encoder;
     ogg_stream_state *ogg_state;
-    
+       
     struct vidcap_src_info *sources;
     nsIDOMCanvasRenderingContext2D *mCtx;
     static VideoRecorder *gVideoRecordingService;
+    
+    nsCOMPtr<nsIAsyncInputStream> mPipeIn;
+    nsCOMPtr<nsIAsyncOutputStream> mPipeOut;
 
 protected:
+    static void Encode(void *data);
     nsresult SetupOggTheora(nsACString& file);
     static int Callback(vidcap_src *src,
-	    void *data, struct vidcap_capture_info *video);
+        void *data, struct vidcap_capture_info *video);
 };
 
 #endif

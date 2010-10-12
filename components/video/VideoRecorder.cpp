@@ -72,38 +72,52 @@ VideoRecorder::Init()
     }
     
     if (!(sapi = vidcap_sapi_acquire(state, 0))) {
-		fprintf(stderr, "Failed to acquire default sapi\n");
-		return NS_ERROR_FAILURE;
-	}
-	
-	if (vidcap_sapi_info_get(sapi, &sapi_info)) {
-		fprintf(stderr, "Failed to get default sapi info\n");
-		return NS_ERROR_FAILURE;
-	}
-	
-	num_devices = vidcap_src_list_update(sapi);
-	if (num_devices < 0) {
-		fprintf(stderr, "Failed vidcap_src_list_update()\n");
-		return NS_ERROR_FAILURE;
-	} else if (num_devices == 0) {
-	    // FIXME: Not really a failure
-        fprintf(stderr, "No video capture sources available\n");
-		return NS_ERROR_FAILURE;
-	}
-	
-	if (!(sources = (struct vidcap_src_info *)
-	    PR_Calloc(num_devices, sizeof(struct vidcap_src_info)))) {
-        return NS_ERROR_OUT_OF_MEMORY;
-	}
-	
-	if (vidcap_src_list_get(sapi, num_devices, sources)) {
-	    PR_Free(sources);
-		fprintf(stderr, "Failed vidcap_src_list_get()\n");
-		return NS_ERROR_FAILURE;
-	}
+        fprintf(stderr, "Failed to acquire default sapi\n");
+        return NS_ERROR_FAILURE;
+    }
     
-    ogg_state = (ogg_stream_state *)PR_Calloc(1, sizeof(ogg_stream_state));
+    if (vidcap_sapi_info_get(sapi, &sapi_info)) {
+        fprintf(stderr, "Failed to get default sapi info\n");
+        return NS_ERROR_FAILURE;
+    }
+    
+    num_devices = vidcap_src_list_update(sapi);
+    if (num_devices < 0) {
+        fprintf(stderr, "Failed vidcap_src_list_update()\n");
+        return NS_ERROR_FAILURE;
+    } else if (num_devices == 0) {
+        /* FIXME: Not really a failure */
+        fprintf(stderr, "No video capture sources available\n");
+        return NS_ERROR_FAILURE;
+    }
+    
+    if (!(sources = (struct vidcap_src_info *)
+        PR_Calloc(num_devices, sizeof(struct vidcap_src_info)))) {
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+    
+    if (vidcap_src_list_get(sapi, num_devices, sources)) {
+        PR_Free(sources);
+        fprintf(stderr, "Failed vidcap_src_list_get()\n");
+        return NS_ERROR_FAILURE;
+    }
+        
     size = WIDTH * HEIGHT * 3 / 2;
+    ogg_state = (ogg_stream_state *)PR_Calloc(1, sizeof(ogg_stream_state));
+    
+    /* Setup our pipe */
+    nsCOMPtr<nsIPipe> pipe = do_CreateInstance("@mozilla.org/pipe;1");
+    if (!pipe)
+        return NS_ERROR_OUT_OF_MEMORY;
+    nsresult rv = pipe->Init(
+        PR_FALSE, PR_FALSE,
+        size, 128, nsnull
+    );
+    if (NS_FAILED(rv))
+        return rv;
+
+    pipe->GetInputStream(getter_AddRefs(mPipeIn));
+    pipe->GetOutputStream(getter_AddRefs(mPipeOut));
     return NS_OK;
 }
 
@@ -132,17 +146,18 @@ static const char table[] = {
 static void
 MakeRandomString(char *buf, PRInt32 bufLen)
 {
-    // turn PR_Now() into milliseconds since epoch
-    // and salt rand with that.
+    /* turn PR_Now() into milliseconds since epoch
+     * and salt rand with that.
+     */
     double fpTime;
     LL_L2D(fpTime, PR_Now());
 
-    // use 1e-6, granularity of PR_Now() on the mac is seconds
+    /* use 1e-6, granularity of PR_Now() on the mac is seconds */
     srand((uint)(fpTime * 1e-6 + 0.5));   
     PRInt32 i;
     for (i=0;i<bufLen;i++) {
         *buf++ = table[rand()%TABLE_SIZE];
-	}
+    }
     *buf = 0;
 }
 
@@ -152,39 +167,48 @@ MakeRandomString(char *buf, PRInt32 bufLen)
 static void
 EscapeBackslash(nsACString& str)
 {
-	const char *sp;
-	const char *mp = "\\";
-	const char *np = "\\\\";
+    const char *sp;
+    const char *mp = "\\";
+    const char *np = "\\\\";
 
-	PRUint32 sl;
-	PRUint32 ml = 1;
-	PRUint32 nl = 2;
+    PRUint32 sl;
+    PRUint32 ml = 1;
+    PRUint32 nl = 2;
 
-	sl = NS_CStringGetData(str, &sp);
-	for (const char* iter = sp; iter <= sp + sl - ml; ++iter) {
-	    if (memcmp(iter, mp, ml) == 0) {
+    sl = NS_CStringGetData(str, &sp);
+    for (const char* iter = sp; iter <= sp + sl - ml; ++iter) {
+        if (memcmp(iter, mp, ml) == 0) {
             PRUint32 offset = iter - sp;
             NS_CStringSetDataRange(str, offset, ml, np, nl);
             sl = NS_CStringGetData(str, &sp);
             iter = sp + offset + nl - 1;
-	    }
-	}
+        }
+    }
 }
 
-int
-VideoRecorder::Callback(vidcap_src *src, void *data,
-    struct vidcap_capture_info *video)
+void
+VideoRecorder::Encode(void *data)
 {
-	nsresult rv;
+    nsresult rv;
+    PRUint32 rd;
     ogg_page og;
     ogg_packet op;
     th_ycbcr_buffer ycbcr;
     
-    unsigned char *yuv = (unsigned char *)video->video_data;
     VideoRecorder *vr = static_cast<VideoRecorder*>(data);
+    unsigned char *frame = (unsigned char *)
+        PR_Calloc(1, vr->size);
     
-    int frames = video->video_data_size / vr->size;
-    for (int i = 0; i < frames; i++) {
+    for (;;) {
+        rv = vr->mPipeIn->Read((char *)frame, vr->size, &rd);
+        if (rd == 0) {
+            /* EOF */
+            return;
+        } else if (rd != (PRUint32) vr->size) {
+            fprintf(stderr, "Could only read %d from pipe!\n", rd);
+            return;
+        }
+
         ycbcr[0].width = WIDTH;
         ycbcr[0].stride = WIDTH;
         ycbcr[0].height = HEIGHT;
@@ -197,17 +221,17 @@ VideoRecorder::Callback(vidcap_src *src, void *data,
         ycbcr[2].height = ycbcr[1].height;
         ycbcr[2].stride = ycbcr[1].stride;
 
-        ycbcr[0].data = yuv;
-        ycbcr[1].data = yuv + WIDTH * HEIGHT;
+        ycbcr[0].data = frame;
+        ycbcr[1].data = frame + WIDTH * HEIGHT;
         ycbcr[2].data = ycbcr[1].data + WIDTH * HEIGHT / 4;
 
         if (th_encode_ycbcr_in(vr->encoder, ycbcr) != 0) {
             fprintf(stderr, "Could not encode frame!\n");
-            return -1;
+            return;
         }
         if (!th_encode_packetout(vr->encoder, 0, &op)) {
             fprintf(stderr, "Could not read packet!\n");
-            return -1;
+            return;
         }
 
         ogg_stream_packetin(vr->ogg_state, &op);
@@ -215,21 +239,42 @@ VideoRecorder::Callback(vidcap_src *src, void *data,
             fwrite(og.header, og.header_len, 1, vr->outfile);
             fwrite(og.body, og.body_len, 1, vr->outfile);
         }
-        
-        if (vr->mCtx) {
-            unsigned char *rgb = (unsigned char *)
-                PR_Calloc(1, WIDTH * HEIGHT * 4);
-            vidcap_i420_to_rgb32(
-                WIDTH, HEIGHT,
-                (const char *)yuv, (char *)rgb
-            );
-			
-			rv = vr->mCtx->PutImageData_explicit(
-				0, 0, WIDTH, HEIGHT, rgb, WIDTH * HEIGHT * 4
-			);
-            PR_Free((void *)rgb);
-        }
-        
+    }
+}
+
+int
+VideoRecorder::Callback(vidcap_src *src, void *data,
+    struct vidcap_capture_info *video)
+{
+    int frames;
+    nsresult rv;
+    PRUint32 wr;
+    VideoRecorder *vr = static_cast<VideoRecorder*>(data);
+    
+    /* Write to pipe, paint to canvas, and return quickly */
+    rv = vr->mPipeOut->Write(
+        (const char *)video->video_data,
+        video->video_data_size, &wr
+    );
+    
+    if (!vr->mCtx) {
+        return 0;
+    }
+
+    frames = video->video_data_size / vr->size;
+    unsigned char *yuv = (unsigned char *)video->video_data;
+
+    for (int i = 0; i < frames; i++) {
+        unsigned char *rgb = (unsigned char *)
+            PR_Calloc(1, WIDTH * HEIGHT * 4);
+        vidcap_i420_to_rgb32(
+            WIDTH, HEIGHT,
+            (const char *)yuv, (char *)rgb
+        );
+        rv = vr->mCtx->PutImageData_explicit(
+            0, 0, WIDTH, HEIGHT, rgb, WIDTH * HEIGHT * 4
+        );
+        PR_Free((void *)rgb);
         yuv += vr->size;
     }
     return 0;
@@ -272,7 +317,7 @@ VideoRecorder::SetupOggTheora(nsACString& file)
         return NS_ERROR_FAILURE;
     }
     EscapeBackslash(path);
-	file.Assign(path.get(), strlen(path.get()));
+    file.Assign(path.get(), strlen(path.get()));
     
     if (ogg_stream_init(ogg_state, rand())) {
         fprintf(stderr, "Failed ogg_stream_init!\n");
@@ -288,8 +333,8 @@ VideoRecorder::SetupOggTheora(nsACString& file)
     ti.pic_x = 0;
     ti.pic_y = 0;
     
-    // Too fast? Why?
-    ti.fps_numerator = FPS_N - 5;
+    /* Too fast? Why? */
+    ti.fps_numerator = FPS_N;
     ti.fps_denominator = FPS_D;
     ti.aspect_numerator = 0;
     ti.aspect_denominator = 0;
@@ -381,16 +426,25 @@ VideoRecorder::Start(
     fmt_info.fps_denominator = FPS_D;
     
     if (vidcap_format_bind(source, &fmt_info)) {
-		fprintf(stderr, "Failed vidcap_format_bind()\n");
-		return NS_ERROR_FAILURE;
-	}
-	
-	if (vidcap_src_capture_start(source, VideoRecorder::Callback, this)) {
-		fprintf(stderr, "Failed vidcap_src_capture_start()\n");
-		return NS_ERROR_FAILURE;
-	}
+        fprintf(stderr, "Failed vidcap_format_bind()\n");
+        return NS_ERROR_FAILURE;
+    }
+    
+    /* Capture then start encode routine on new thread */
+    if (vidcap_src_capture_start(source, VideoRecorder::Callback, this)) {
+        fprintf(stderr, "Failed vidcap_src_capture_start()\n");
+        return NS_ERROR_FAILURE;
+    }
+    
+    encthr = PR_CreateThread(
+        PR_SYSTEM_THREAD,
+        VideoRecorder::Encode, this,
+        PR_PRIORITY_NORMAL,
+        PR_GLOBAL_THREAD,
+        PR_JOINABLE_THREAD, 0
+    );
 
-	recording = 1;
+    recording = 1;
     return NS_OK;
 }
 
@@ -407,11 +461,16 @@ VideoRecorder::Stop()
         return NS_ERROR_FAILURE;    
     }
     if (vidcap_src_capture_stop(source)) {
-		fprintf(stderr, "Failed vidcap_src_capture_stop()\n");
-		return NS_ERROR_FAILURE;
-	}
+        fprintf(stderr, "Failed vidcap_src_capture_stop()\n");
+        return NS_ERROR_FAILURE;
+    }
     vidcap_src_release(source);
     
+    /* Wait for encoder to finish */
+    mPipeOut->Close();
+    PR_JoinThread(encthr);
+    mPipeIn->Close();
+
     th_encode_free(encoder);
     if (ogg_stream_flush(ogg_state, &page)) {
         fwrite(page.header, page.header_len, 1, outfile);
