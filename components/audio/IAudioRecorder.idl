@@ -36,12 +36,10 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsISupports.idl"
-#include "nsIAsyncInputStream.idl"
 
 [scriptable, uuid(cb319cdf-badd-4549-b4d5-a10ff2498063)]
 interface IAudioRecorder : nsISupports
 {
-	nsIAsyncInputStream start();
-	ACString startRecordToFile();
+	ACString start();
 	void stop();
 };

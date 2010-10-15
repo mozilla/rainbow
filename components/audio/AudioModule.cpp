@@ -36,29 +36,30 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsIGenericFactory.h"
 #include "AudioRecorder.h"
-#include "AudioEncoder.h"
+#include "mozilla/ModuleUtils.h"
 
-NS_GENERIC_FACTORY_CONSTRUCTOR(AudioEncoder)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(AudioRecorder,
-                                         AudioRecorder::GetSingleton)
+    AudioRecorder::GetSingleton)
 
-static nsModuleComponentInfo components[] =
-{
-  {
-    AUDIO_RECORDER_CLASSNAME,
-    AUDIO_RECORDER_CID,
-    AUDIO_RECORDER_CONTRACTID,
-    AudioRecorderConstructor,
-  },
+NS_DEFINE_NAMED_CID(AUDIO_RECORDER_CID);
 
-  {
-	AUDIO_ENCODER_CLASSNAME,
-	AUDIO_ENCODER_CID,
-	AUDIO_ENCODER_CONTRACTID,
-	AudioEncoderConstructor,
-  }
+static const mozilla::Module::CIDEntry kAudioCIDs[] = {
+    { &kAUDIO_RECORDER_CID, false, NULL, AudioRecorderConstructor },
+    { NULL }
 };
 
-NS_IMPL_NSGETMODULE(nsJetpackAudio, components) 
+static const mozilla::Module::ContractIDEntry kAudioContracts[] = {
+    { AUDIO_RECORDER_CONTRACTID, &kAUDIO_RECORDER_CID },
+    { NULL }
+};
+
+static const mozilla::Module AudioRecorderModule = {
+    mozilla::Module::kVersion,
+    kAudioCIDs,
+    kAudioContracts,
+    NULL   
+};
+
+NSMODULE_DEFN(nsAudioRecorder) = &AudioRecorderModule;
+

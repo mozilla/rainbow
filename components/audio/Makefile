@@ -6,7 +6,7 @@ ifeq ($(sys), Darwin)
   compiler = gcc
   cxx = g++
   so = dylib
-  cppflags += -dynamiclib -DDEBUG
+  cppflags += -dynamiclib -DDEBUG -DMOZ_NO_MOZALLOC
 else
 ifeq ($(sys), Linux)
   os = Linux
@@ -49,8 +49,8 @@ so_target = $(target:=.$(so))
 cpp_objects = $(cpp_sources:.cpp=.o)
 
 # source and path configurations
-idl = IAudioEncoder.idl IAudioRecorder.idl
-cpp_sources = AudioEncoder.cpp AudioRecorder.cpp AudioModule.cpp
+idl = IAudioRecorder.idl
+cpp_sources = AudioRecorder.cpp AudioModule.cpp
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
@@ -101,14 +101,10 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              -Wl,-exported_symbol \
-              -Wl,_NSGetModule \
               /opt/local/lib/libportaudio.a \
-              /opt/local/lib/libsndfile.a \
               /opt/local/lib/libvorbis.a \
               /opt/local/lib/libvorbisenc.a \
               /opt/local/lib/libogg.a \
-              /opt/local/lib/libFLAC.a \
               -framework CoreAudio \
               -framework AudioToolbox \
               -framework AudioUnit \
@@ -132,11 +128,9 @@ ifeq ($(os), Linux)
              -Wl,-rpath-link,$(sdkdir)/bin \
              $(sdkdir)/lib/libxpcomglue_s.a \
              /usr/lib/libportaudio.a \
-             /usr/local/lib/libsndfile.a \
              /usr/lib/libvorbis.a \
              /usr/lib/libvorbisenc.a \
              /usr/lib/libogg.a \
-             /usr/lib/libFLAC.a \
              /usr/lib/libjack.a \
              $(libdirs) $(libs)
 else

@@ -39,17 +39,15 @@
 #define AudioRecorder_h_
 
 #include "IAudioRecorder.h"
-#include "portaudio.h"
 
-// MSVC Weirdness
-#define __int64_t __int64
-#include "sndfile.h"
-#undef __int64_t
+#include <ogg/ogg.h>
+#include <portaudio.h>
+#include <vorbis/vorbisenc.h>
 
 #include "prmem.h"
+#include "prthread.h"
+
 #include "nsIPipe.h"
-#include "nsCOMPtr.h"
-#include "nsAutoPtr.h"
 #include "nsStringAPI.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
@@ -62,19 +60,24 @@
 #define AUDIO_RECORDER_CID { 0x1fdf790f, 0x0648, 0x4e53, \
                            { 0x92, 0x7d, 0xbe, 0x13, 0xa3, 0xc6, 0x92, 0x54 } }
 
-#ifndef SAMPLE_RATE
-#define SAMPLE_RATE         (44000)
-#endif
-#ifndef FRAMES_PER_BUFFER
-#define FRAMES_PER_BUFFER   (512)
-#endif
-#ifndef NUM_CHANNELS
-#define NUM_CHANNELS        (2)
-#endif
-#ifndef PA_SAMPLE_TYPE
-#define PA_SAMPLE_TYPE      paInt32
-typedef int SAMPLE;
-#endif
+#define SAMPLE_RATE         44100
+#define FRAMES_BUFFER       1024
+#define NUM_CHANNELS        2
+#define SAMPLE_FORMAT       paInt16
+#define SAMPLE_QUALITY      0.4
+
+typedef struct {
+	ogg_page og;
+	ogg_packet op;
+	ogg_stream_state os;
+} ogg_state;
+
+typedef struct {
+	vorbis_info vi;
+	vorbis_block vb;
+	vorbis_comment vc;
+	vorbis_dsp_state vd;
+} vorbis_state;
 
 class AudioRecorder : public IAudioRecorder
 {
@@ -87,28 +90,30 @@ public:
     virtual ~AudioRecorder();
     AudioRecorder(){}
     
-    nsIAsyncInputStream *mPipeIn;
-    nsIAsyncOutputStream *mPipeOut;
-
+    
 private:
     int recording;
+	FILE *outfile;
+    PRThread *encthr;
     PaStream *stream;
-	SNDFILE *outfile;
+	
+	ogg_state *odata;
+	vorbis_state *vdata;
+       
+    nsCOMPtr<nsIAsyncInputStream> mPipeIn;
+    nsCOMPtr<nsIAsyncOutputStream> mPipeOut;
+
     static AudioRecorder *gAudioRecordingService;
-    
+
 protected:
-    static int RecordCallback(const void *input, void *output,
+    static void Encode(void *data);
+    nsresult SetupOggVorbis(nsACString& file);
+    static int Callback(const void *input, void *output,
         unsigned long framesPerBuffer,
         const PaStreamCallbackTimeInfo* timeInfo,
         PaStreamCallbackFlags statusFlags,
-        void *userData
+        void *data
     );
-	static int RecordToFileCallback(const void *input, void *output,
-    	unsigned long framesPerBuffer,
-    	const PaStreamCallbackTimeInfo* timeInfo,
-    	PaStreamCallbackFlags statusFlags,
-    	void *userData
-	);
 };
 
 #endif

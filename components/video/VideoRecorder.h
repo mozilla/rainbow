@@ -93,10 +93,11 @@ private:
        
     struct vidcap_src_info *sources;
     nsIDOMCanvasRenderingContext2D *mCtx;
-    static VideoRecorder *gVideoRecordingService;
     
     nsCOMPtr<nsIAsyncInputStream> mPipeIn;
     nsCOMPtr<nsIAsyncOutputStream> mPipeOut;
+
+    static VideoRecorder *gVideoRecordingService;
 
 protected:
     static void Encode(void *data);
