@@ -83,13 +83,13 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              /opt/local/lib/libvidcap.a \
-              /opt/local/lib/libogg.a \
-              /opt/local/lib/libtheora.a \
-              /opt/local/lib/libtheoraenc.a \
-			  -framework Carbon \
-			  -framework QuartzCore \
-			  -framework QuickTime \
+              ../../lib/darwin_386/libvidcap.a \
+              ../../lib/darwin_386/libogg.a \
+              ../../lib/darwin_386/libtheora.a \
+              ../../lib/darwin_386/libtheoraenc.a \
+              -framework Carbon \
+              -framework QuartzCore \
+              -framework QuickTime \
               $(libdirs) $(libs)
 endif
 

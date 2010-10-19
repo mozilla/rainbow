@@ -101,10 +101,10 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              /opt/local/lib/libportaudio.a \
-              /opt/local/lib/libvorbis.a \
-              /opt/local/lib/libvorbisenc.a \
-              /opt/local/lib/libogg.a \
+              ../../lib/darwin_386/libportaudio.a \
+              ../../lib/darwin_386/libvorbis.a \
+              ../../lib/darwin_386/libvorbisenc.a \
+              ../../lib/darwin_386/libogg.a \
               -framework CoreAudio \
               -framework AudioToolbox \
               -framework AudioUnit \
