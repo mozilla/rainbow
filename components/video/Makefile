@@ -62,8 +62,7 @@ headers = -I. \
 		  -I$(sdkdir)/include/content \
 		  -I$(sdkdir)/include/dom \
           -I$(sdkdir)/include/nspr \
-          -I$(sdkdir)/sdk/include \
-          -I/opt/local/include
+          -I$(sdkdir)/sdk/include 
 
 # libraries
 libdirs := $(sdkdir)/lib $(sdkdir)/bin
@@ -73,6 +72,7 @@ libs := xpcomglue_s xpcom nspr4 plds4 plc4
 ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
+  headers += -I../../lib/darwin_i386/include
   cppflags += -c -pipe -Os -arch i386 \
               -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
               -fno-common -fshort-wchar -fpascal-strings -pthread \
@@ -83,10 +83,10 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              ../../lib/darwin_386/libvidcap.a \
-              ../../lib/darwin_386/libogg.a \
-              ../../lib/darwin_386/libtheora.a \
-              ../../lib/darwin_386/libtheoraenc.a \
+              ../../lib/darwin_i386/libvidcap.a \
+              ../../lib/darwin_i386/libogg.a \
+              ../../lib/darwin_i386/libtheora.a \
+              ../../lib/darwin_i386/libtheoraenc.a \
               -framework Carbon \
               -framework QuartzCore \
               -framework QuickTime \

@@ -90,7 +90,7 @@ endif
 ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
-  headers += -I/opt/local/include
+  headers += -I../../lib/darwin_i386/include
   cppflags += -c -pipe -Os -arch i386 \
               -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
               -fno-common -fshort-wchar -fpascal-strings -pthread \
@@ -101,10 +101,10 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              ../../lib/darwin_386/libportaudio.a \
-              ../../lib/darwin_386/libvorbis.a \
-              ../../lib/darwin_386/libvorbisenc.a \
-              ../../lib/darwin_386/libogg.a \
+              ../../lib/darwin_i386/libportaudio.a \
+              ../../lib/darwin_i386/libvorbis.a \
+              ../../lib/darwin_i386/libvorbisenc.a \
+              ../../lib/darwin_i386/libogg.a \
               -framework CoreAudio \
               -framework AudioToolbox \
               -framework AudioUnit \
