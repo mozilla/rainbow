@@ -1,5 +1,7 @@
 interfaces components/audio/IAudioRecorder.xpt
 interfaces components/video/IVideoRecorder.xpt
+interfaces components/media/IMediaRecorder.xpt
 binary-component components/audio/libjetpackaudio.dylib ABI=Darwin_x86-gcc3
 binary-component components/video/libjetpackvideo.dylib ABI=Darwin_x86-gcc3
+binary-component components/media/libmediarecorder.dylib ABI=Darwin_x86-gcc3
 
