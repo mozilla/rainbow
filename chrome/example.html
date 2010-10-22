@@ -1,0 +1,47 @@
+<html>
+<head>
+    <title>Rainbow!</title>
+    <script type="application/javascript;version=1.8">
+        let Fi = "";
+        let Re = false;
+        let Cc = Components.classes;
+        let Ci = Components.interfaces;
+        let Me = Cc["@labs.mozilla.com/media/recorder;1"].
+            getService(Ci.IMediaRecorder);
+    </script>
+</head>
+<body style="margin:50px 0px;padding:0px;text-align:center;">
+    <h1>Recording Example</h1>
+    <canvas id="tehcanvas" width="640" height="480"></canvas>
+    <p><input type="button" id="tehbutton" value="Start!"/></p>
+    <p id="tehmsg"></p>
+</body>
+<script type="application/javascript;version=1.8">
+    let img = new Image();
+    let msg = document.getElementById("tehmsg");
+    let but = document.getElementById("tehbutton");
+    let ctx = document.getElementById("tehcanvas").getContext("2d");
+
+    img.src = "colorful.png";
+    img.onload = function() {
+        ctx.drawImage(img, 120, 0);
+    }
+
+    but.onclick = function() {
+        if (Re) {
+            // Stop recording
+            Me.stop();
+            Re = false;
+            but.value = "Start!";
+            ctx.drawImage(img, 120, 0);
+            msg.innerHTML = "Your video was saved to: " + Fi;
+        } else {
+            // Start recording
+            Re = true;
+            but.value = "Stop!";
+            msg.innerHTML = " ";
+            Fi = Me.start(true, true, ctx);
+        }
+    }
+</script>
+</html>

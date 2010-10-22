@@ -1,3 +1,4 @@
+content rainbow chrome/
 interfaces components/media/IMediaRecorder.xpt
 binary-component components/media/libmediarecorder.dylib ABI=Darwin_x86-gcc3
 

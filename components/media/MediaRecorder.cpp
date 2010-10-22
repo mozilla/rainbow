@@ -232,6 +232,8 @@ MediaRecorder::Encode(void *data)
      * millisecond level, our brain does an amazing job of approximating and
      * WANTS to see synchronized audio and video. It all works out just fine :)
      *
+     * OR DOES IT? FIXME!
+     *
      * TODO: Figure out if PR_Calloc will be more efficient if we call it for
      * storing more than just 1 frame at a time. For instance, we can wait
      * a second and encode 10 frames of video and 88200 bytes of audio per
