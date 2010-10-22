@@ -63,7 +63,7 @@ headers = -I. \
 		  -I$(sdkdir)/include/dom \
           -I$(sdkdir)/include/nspr \
           -I$(sdkdir)/sdk/include \
-          -I../../lib/darwin_i386/include
+          -I../../lib/Darwin_i386-gcc3/include
 
 # libraries
 libdirs := $(sdkdir)/lib $(sdkdir)/bin
@@ -83,13 +83,13 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
               -Wl,-executable_path,$(sdkdir)/bin \
               -Wl,-dead_strip \
-              ../../lib/darwin_i386/libogg.a \
-              ../../lib/darwin_i386/libvorbis.a \
-              ../../lib/darwin_i386/libvidcap.a \
-              ../../lib/darwin_i386/libtheora.a \
-              ../../lib/darwin_i386/libtheoraenc.a \
-              ../../lib/darwin_i386/libvorbisenc.a \
-              ../../lib/darwin_i386/libportaudio.a \
+              ../../lib/Darwin_i386-gcc3/libogg.a \
+              ../../lib/Darwin_i386-gcc3/libvorbis.a \
+              ../../lib/Darwin_i386-gcc3/libvidcap.a \
+              ../../lib/Darwin_i386-gcc3/libtheora.a \
+              ../../lib/Darwin_i386-gcc3/libtheoraenc.a \
+              ../../lib/Darwin_i386-gcc3/libvorbisenc.a \
+              ../../lib/Darwin_i386-gcc3/libportaudio.a \
 			  -framework Carbon \
               -framework CoreAudio \
 			  -framework QuartzCore \
