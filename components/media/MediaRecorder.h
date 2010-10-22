@@ -130,6 +130,7 @@ private:
     Video *vState;
 
     PRThread *encoder;
+    PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
 
     static void Encode(void *data);
