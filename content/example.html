@@ -2,12 +2,10 @@
 <head>
     <title>Rainbow!</title>
     <script type="application/javascript;version=1.8">
-        let Fi = "";
-        let Re = false;
-        let Cc = Components.classes;
-        let Ci = Components.interfaces;
-        let Me = Cc["@labs.mozilla.com/media/recorder;1"].
-            getService(Ci.IMediaRecorder);
+        // In JS content you'd say: let Me = window.navigator.service.media;
+        // but in Chrome we're saying:
+        let Me = Components.classes["@labs.mozilla.com/media/recorder;1"].
+            getService(Components.interfaces.IMediaRecorder);
     </script>
 </head>
 <body style="margin:50px 0px;padding:0px;text-align:center;">
@@ -17,6 +15,8 @@
     <p id="tehmsg"></p>
 </body>
 <script type="application/javascript;version=1.8">
+    let Fi = "";
+    let Re = false;
     let img = new Image();
     let msg = document.getElementById("tehmsg");
     let but = document.getElementById("tehbutton");
