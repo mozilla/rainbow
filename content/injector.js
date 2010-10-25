@@ -31,14 +31,17 @@ let RainbowInjector = {
     },
 
     inject: function(win) {
-        let sandbox = new Components.utils.Sandbox(win);
+        let sandbox = new Components.utils.Sandbox(
+            Components.classes["@mozilla.org/systemprincipal;1"].
+            createInstance(Components.interfaces.nsIPrincipal);
+        );
         sandbox.importFunction(this._media.start, "recStart");
         sandbox.importFunction(this._media.stop, "recStop");
         sandbox.window = win.wrappedJSObject;
-
-        dump(Components.utils.evalInSandbox(
+        
+        Components.utils.evalInSandbox(
             this._toInject, sandbox, "1.8", "injected.js", 1
-        ));
+        );
     }
 };
 
