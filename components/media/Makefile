@@ -6,7 +6,6 @@ ifeq ($(sys), Darwin)
   compiler = gcc
   cxx = g++
   so = dylib
-  cppflags += -dynamiclib -DMOZ_NO_MOZALLOC
 else
 ifeq ($(sys), MINGW32_NT-6.1)
   os = WINNT
@@ -72,22 +71,14 @@ headers = -I. -I$(sdkdir)/include \
 
 # libraries
 libdirs := $(sdkdir)/lib $(sdkdir)/bin
-
-ifeq ($(os), Darwin)
-libs := xpcomglue_s 
-else
-ifeq ($(os), WINNT)
-libs := xpcomglue_s_nomozalloc
-endif
-endif
-libs += xpcom nspr4 plds4 plc4
+libs := xpcomglue_s xpcom nspr4 mozalloc plds4 plc4
 
 # compiler and Linker Flags
 ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
   headers += -I../../lib/Darwin_i386-gcc3/include
-  cppflags += -c -pipe -Os -arch i386 \
+  cppflags += -c -pipe -Os -arch i386 -dynamiclib -DMOZ_NO_MOZALLOC \
     -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -fshort-wchar -fpascal-strings -pthread \
     -Wall -Werror -Wconversion -Wpointer-arith \
@@ -133,8 +124,8 @@ ifeq ($(os), WINNT)
     ../../lib/WINNT_x86-msvc/libtheora.lib \
     ../../lib/WINNT_x86-msvc/portaudio.lib \
     ../../lib/WINNT_x86-msvc/libvidcap.lib \
-    strmiids.lib comsuppw.lib msvcrt.lib \
-    /NODEFAULTLIB:libcmt 
+    strmiids.lib comsuppw.lib msvcrt.lib /NODEFAULTLIB:msvcrt \
+    #msvcrt.lib 
     #kernel32.lib user32.lib gdi32.lib winmm.lib \
     #wsock32.lib advapi32.lib 
 rcflags := -r $(headers)
