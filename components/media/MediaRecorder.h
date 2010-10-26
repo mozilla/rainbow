@@ -51,12 +51,17 @@
 #include "prthread.h"
 
 #include "nsIPipe.h"
+#include "nsIDOMFile.h"
 #include "nsStringAPI.h"
+#include "nsIDOMFileList.h"
+#include "nsIDOMDocument.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
+#include "nsIDOMHTMLInputElement.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsComponentManagerUtils.h"
+#include "nsIDOMHTMLCanvasElement.h"
 #include "nsIDOMCanvasRenderingContext2D.h"
 
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
@@ -136,7 +141,7 @@ private:
     static void Encode(void *data);
     nsresult SetupTheoraStream();
     nsresult SetupVorbisStream();
-    nsresult CreateFile(nsACString& file);
+    nsresult CreateFile(nsIDOMFile **file, nsIDOMCanvasRenderingContext2D *ctx);
 
     static MediaRecorder *gMediaRecordingService;
 

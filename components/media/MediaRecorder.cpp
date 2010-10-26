@@ -639,13 +639,20 @@ MediaRecorder::SetupVorbisStream()
  * Create a temporary file to dump to
  */
 nsresult
-MediaRecorder::CreateFile(nsACString& file)
+MediaRecorder::CreateFile(nsIDOMFile **file, nsIDOMCanvasRenderingContext2D *ctx)
 {
     nsresult rv;
     char buf[13];
     nsCAutoString path;
     nsCOMPtr<nsIFile> o;
-    
+    const PRUnichar *name;
+
+    nsCOMPtr<nsIDOMElement> elm;
+    nsCOMPtr<nsIDOMDocument> doc;
+    nsCOMPtr<nsIDOMFileList> list;
+    nsCOMPtr<nsIDOMHTMLInputElement> input;
+    nsCOMPtr<nsIDOMHTMLCanvasElement> canvas;    
+
     /* Assign temporary name */
     rv = NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(o));
     if (NS_FAILED(rv)) return rv;
@@ -667,8 +674,29 @@ MediaRecorder::CreateFile(nsACString& file)
         return NS_ERROR_FAILURE;
     }
     EscapeBackslash(path);
-    file.Assign(path.get(), strlen(path.get()));
-    return NS_OK;
+
+    /*
+     * We use a roundabout way of returning a nsIDOMFile; namely by using
+     * <input type='file'>. We do this because there is no public way of 
+     * instantiating an nsIDOMFile, see bug #607114.
+     */
+    rv = ctx->GetCanvas(getter_AddRefs(canvas));
+    if (NS_FAILED(rv)) return rv;
+    rv = canvas->GetOwnerDocument(getter_AddRefs(doc));
+    if (NS_FAILED(rv)) return rv;
+    rv = doc->CreateElement(NS_LITERAL_STRING("input"), getter_AddRefs(elm));
+    if (NS_FAILED(rv)) return rv;
+
+    input = do_QueryInterface(elm);
+    rv = input->GetFiles(getter_AddRefs(list));
+    if (NS_FAILED(rv)) return rv;
+
+    name = NS_ConvertUTF8toUTF16(path.get()).get();
+    rv = input->MozSetFileNameArray(&name, 1);
+    if (NS_FAILED(rv)) return rv;
+
+    rv = list->Item(0, file);
+    return rv;
 }
 
 /*
@@ -678,7 +706,7 @@ NS_IMETHODIMP
 MediaRecorder::Start(
     PRBool audio, PRBool video,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsACString &file
+    nsIDOMFile **file
 )
 {
     nsresult rv;
@@ -695,7 +723,7 @@ MediaRecorder::Start(
         return NS_ERROR_FAILURE;
     }
 
-    rv = CreateFile(file);
+    rv = CreateFile(file, ctx);
     if (NS_FAILED(rv)) return rv;
 
     /* Get ready for video! */

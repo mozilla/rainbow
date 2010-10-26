@@ -76,7 +76,7 @@ let RainbowInjector = {
 
         return this._toInject = toInject;
     },
-
+    
     inject: function(win) {
         let sandbox = new Components.utils.Sandbox(
             Components.classes["@mozilla.org/systemprincipal;1"].
