@@ -294,6 +294,30 @@ MediaRecorder::Encode(void *data)
             fprintf(stderr, "Could not read packet!\n");
             return;
         }
+
+        /* Write to canvas, if needed. Move to another thread? */
+        if (mr->vState->vCanvas) {
+            unsigned char *rgb = (unsigned char *)
+                PR_Calloc(1, WIDTH * HEIGHT * 4);
+
+            /* Canvas wants rgba. */
+            vidcap_i420_to_rgb32(
+                WIDTH, HEIGHT,
+                (const char *)v_frame, (char *)rgb
+            );
+            /* That didn't give us what we want. Reconfigure. */
+            int tmp = 0;
+            for (int j = 0; j < WIDTH * HEIGHT * 4; j += 4) {
+                tmp = rgb[j+2];
+                rgb[j+2] = rgb[j];
+                rgb[j] = tmp;
+            }
+            rv = mr->vState->vCanvas->PutImageData_explicit(
+                0, 0, WIDTH, HEIGHT, rgb, WIDTH * HEIGHT * 4
+            );
+            PR_Free((void *)rgb);
+        }
+
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
         while (ogg_stream_pageout(&mr->vState->os, &mr->vState->og)) {
             fwrite(mr->vState->og.header, mr->vState->og.header_len,
@@ -359,37 +383,15 @@ int
 MediaRecorder::VideoCallback(vidcap_src *src, void *data,
     struct vidcap_capture_info *video)
 {
-    int frames;
     nsresult rv;
     PRUint32 wr;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
     
-    /* Write to pipe, paint to canvas, and return quickly */
+    /* Write to pipe and return quickly */
     rv = mr->vState->vPipeOut->Write(
         (const char *)video->video_data,
         video->video_data_size, &wr
     );
-    if (!mr->vState->vCanvas) {
-        return 0;
-    }
-
-    frames = video->video_data_size / mr->vState->fsize;
-    unsigned char *yuv = (unsigned char *)video->video_data;
-
-    for (int i = 0; i < frames; i++) {
-        unsigned char *rgb = (unsigned char *)
-            PR_Calloc(1, WIDTH * HEIGHT * 4);
-        /* Canvas wants rgb */
-        vidcap_i420_to_rgb32(
-            WIDTH, HEIGHT,
-            (const char *)yuv, (char *)rgb
-        );
-        rv = mr->vState->vCanvas->PutImageData_explicit(
-            0, 0, WIDTH, HEIGHT, rgb, WIDTH * HEIGHT * 4
-        );
-        PR_Free((void *)rgb);
-        yuv += mr->vState->fsize;
-    }
     return 0;
 }
 
