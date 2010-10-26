@@ -34,15 +34,14 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "nsIDOMFile.idl"
-#include "nsIDOMDocument.idl"
+#include "nsIDOMHTMLInputElement.idl"
 #include "nsIDOMCanvasRenderingContext2D.idl"
 
 [scriptable, uuid(c467b1f4-551c-4e2f-a6ba-cb7d792d1452)]
 interface IMediaRecorder : nsISupports
 {
-    nsIDOMFile start(in boolean audio, in boolean video,
-        in nsIDOMDocument doc,
+    ACString start(in boolean audio, in boolean video,
+        in nsIDOMHTMLInputElement input,
         in nsIDOMCanvasRenderingContext2D ctx);
     void stop();
 };

@@ -56,9 +56,7 @@
 #include "prthread.h"
 
 #include "nsIPipe.h"
-#include "nsIDOMFile.h"
 #include "nsStringAPI.h"
-#include "nsIDOMFileList.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
 #include "nsIDOMHTMLInputElement.h"
@@ -144,7 +142,7 @@ private:
     static void Encode(void *data);
     nsresult SetupTheoraStream();
     nsresult SetupVorbisStream();
-    nsresult CreateFile(nsIDOMDocument *doc, nsIDOMFile **file);
+    nsresult CreateFile(nsIDOMHTMLInputElement *input, nsACString &file);
 
     static MediaRecorder *gMediaRecordingService;
 

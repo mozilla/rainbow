@@ -2,10 +2,7 @@
 <head>
     <title>Rainbow!</title>
     <script type="application/javascript;version=1.8">
-        // In JS content you'd say: let Me = window.navigator.service.media;
-        // but in Chrome we're saying:
-        let Me = Components.classes["@labs.mozilla.com/media/recorder;1"].
-            getService(Components.interfaces.IMediaRecorder);
+        let Me = window.navigator.service.media;
     </script>
 </head>
 <body style="margin:50px 0px;padding:0px;text-align:center;">
@@ -13,12 +10,14 @@
     <canvas id="tehcanvas" width="640" height="480"></canvas>
     <p><input type="button" id="tehbutton" value="Start!"/></p>
     <p id="tehmsg"></p>
+    <input type="file" id="tehfile" style="display:none;"></input>
 </body>
 <script type="application/javascript;version=1.8">
-    let Fi = "";
+    let Sr, Fi;
     let Re = false;
     let img = new Image();
     let msg = document.getElementById("tehmsg");
+    let fil = document.getElementById("tehfile");
     let but = document.getElementById("tehbutton");
     let ctx = document.getElementById("tehcanvas").getContext("2d");
 
@@ -30,18 +29,22 @@
     but.onclick = function() {
         if (Re) {
             // Stop recording
-            Me.stop();
+            Fi = Sr.stop();
             Re = false;
             but.value = "Start!";
             ctx.drawImage(img, 120, 0);
-            msg.innerHTML = "Your video was saved to: " + Fi;
+            msg.innerHTML = "Your video was recorded to: " + Fi;
+            // The path is useless. Access the actual file with:
+            // fil.files[0].name, fil.files[0].size, fil.files[0].type etc.
+            // See https://developer.mozilla.org/en/Using_files_from_web_applications
         } else {
             // Start recording
             Re = true;
             but.value = "Stop!";
             msg.innerHTML = " ";
-            Fi = Me.start(true, true, ctx);
+            Sr = Me.record(true, true, fil, ctx);
         }
     }
 </script>
 </html>
+

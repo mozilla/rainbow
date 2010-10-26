@@ -639,15 +639,13 @@ MediaRecorder::SetupVorbisStream()
  * Create a temporary file to dump to
  */
 nsresult
-MediaRecorder::CreateFile(nsIDOMDocument *doc, nsIDOMFile **file)
+MediaRecorder::CreateFile(nsIDOMHTMLInputElement *input, nsACString &file)
 {
     nsresult rv;
     char buf[13];
+    const char *name;
     nsCAutoString path;
     nsCOMPtr<nsIFile> o;
-    nsCOMPtr<nsIDOMElement> iel;
-    nsCOMPtr<nsIDOMFileList> list;
-    nsCOMPtr<nsIDOMHTMLInputElement> inp;
 
     /* Assign temporary name */
     rv = NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(o));
@@ -665,7 +663,8 @@ MediaRecorder::CreateFile(nsIDOMDocument *doc, nsIDOMFile **file)
     if (NS_FAILED(rv)) return rv;
 
     /* Open file */
-    if (!(outfile = fopen(path.get(), "w+"))) {
+    name = path.get();
+    if (!(outfile = fopen(name, "w+"))) {
         fprintf(stderr, "Could not open OGG file\n");
         return NS_ERROR_FAILURE;
     }
@@ -675,22 +674,12 @@ MediaRecorder::CreateFile(nsIDOMDocument *doc, nsIDOMFile **file)
     /* We get a DOMFile in this convoluted manner because nsDOMFile is not
      * public. See bug #607114
      */
-    rv = doc->CreateElement(NS_LITERAL_STRING("input"), getter_AddRefs(iel));
-    if (NS_FAILED(rv)) return rv;
-    inp = do_QueryInterface(iel);
-    rv = inp->SetType(NS_LITERAL_STRING("file"));
-    if (NS_FAILED(rv)) return rv;
-
-    NS_ConvertUTF8toUTF16 unipath(path.get());
+    NS_ConvertUTF8toUTF16 unipath(name);
     const PRUnichar *arr = unipath.get();
-    rv = inp->MozSetFileNameArray(&arr, 1);
+    rv = input->MozSetFileNameArray(&arr, 1);
     if (NS_FAILED(rv)) return rv;
 
-    rv = inp->GetFiles(getter_AddRefs(list));
-    if (NS_FAILED(rv)) return rv;
-    rv = list->Item(0, file);
-    if (NS_FAILED(rv)) return rv;
-
+    file.Assign(name, strlen(name));
     return rv;
 }
 
@@ -700,9 +689,9 @@ MediaRecorder::CreateFile(nsIDOMDocument *doc, nsIDOMFile **file)
 NS_IMETHODIMP
 MediaRecorder::Start(
     PRBool audio, PRBool video,
-    nsIDOMDocument *doc,
+    nsIDOMHTMLInputElement *input,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsIDOMFile **file
+    nsACString &file
 )
 {
     nsresult rv;
@@ -719,7 +708,7 @@ MediaRecorder::Start(
         return NS_ERROR_FAILURE;
     }
 
-    rv = CreateFile(doc, file);
+    rv = CreateFile(input, file);
     if (NS_FAILED(rv)) return rv;
 
     /* Get ready for video! */
