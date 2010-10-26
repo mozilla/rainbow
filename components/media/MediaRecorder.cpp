@@ -639,13 +639,16 @@ MediaRecorder::SetupVorbisStream()
  * Create a temporary file to dump to
  */
 nsresult
-MediaRecorder::CreateFile(nsACString& file)
+MediaRecorder::CreateFile(nsIDOMDocument *doc, nsIDOMFile **file)
 {
     nsresult rv;
     char buf[13];
     nsCAutoString path;
     nsCOMPtr<nsIFile> o;
-    
+    nsCOMPtr<nsIDOMElement> iel;
+    nsCOMPtr<nsIDOMFileList> list;
+    nsCOMPtr<nsIDOMHTMLInputElement> inp;
+
     /* Assign temporary name */
     rv = NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(o));
     if (NS_FAILED(rv)) return rv;
@@ -667,8 +670,28 @@ MediaRecorder::CreateFile(nsACString& file)
         return NS_ERROR_FAILURE;
     }
     EscapeBackslash(path);
-    file.Assign(path.get(), strlen(path.get()));
-    return NS_OK;
+
+
+    /* We get a DOMFile in this convoluted manner because nsDOMFile is not
+     * public. See bug #607114
+     */
+    rv = doc->CreateElement(NS_LITERAL_STRING("input"), getter_AddRefs(iel));
+    if (NS_FAILED(rv)) return rv;
+    inp = do_QueryInterface(iel);
+    rv = inp->SetType(NS_LITERAL_STRING("file"));
+    if (NS_FAILED(rv)) return rv;
+
+    NS_ConvertUTF8toUTF16 unipath(path.get());
+    const PRUnichar *arr = unipath.get();
+    rv = inp->MozSetFileNameArray(&arr, 1);
+    if (NS_FAILED(rv)) return rv;
+
+    rv = inp->GetFiles(getter_AddRefs(list));
+    if (NS_FAILED(rv)) return rv;
+    rv = list->Item(0, file);
+    if (NS_FAILED(rv)) return rv;
+
+    return rv;
 }
 
 /*
@@ -677,8 +700,9 @@ MediaRecorder::CreateFile(nsACString& file)
 NS_IMETHODIMP
 MediaRecorder::Start(
     PRBool audio, PRBool video,
+    nsIDOMDocument *doc,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsACString &file
+    nsIDOMFile **file
 )
 {
     nsresult rv;
@@ -695,7 +719,7 @@ MediaRecorder::Start(
         return NS_ERROR_FAILURE;
     }
 
-    rv = CreateFile(file);
+    rv = CreateFile(doc, file);
     if (NS_FAILED(rv)) return rv;
 
     /* Get ready for video! */

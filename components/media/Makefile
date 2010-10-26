@@ -6,7 +6,7 @@ ifeq ($(sys), Darwin)
   compiler = gcc
   cxx = g++
   so = dylib
-  cppflags += -dynamiclib -DDEBUG -DMOZ_NO_MOZALLOC
+  cppflags += -dynamiclib -DMOZ_NO_MOZALLOC
 else
 ifeq ($(sys), MINGW32_NT-6.1)
   os = WINNT

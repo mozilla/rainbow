@@ -41,10 +41,10 @@
 
 #ifdef _MSC_VER
 #include "windows.h"
-#include "stdio.h"
 #endif
 
 #include <time.h>
+#include <stdio.h>
 #include <ogg/ogg.h>
 #include <portaudio.h>
 #include <vidcap/vidcap.h>
@@ -56,9 +56,12 @@
 #include "prthread.h"
 
 #include "nsIPipe.h"
+#include "nsIDOMFile.h"
 #include "nsStringAPI.h"
+#include "nsIDOMFileList.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
+#include "nsIDOMHTMLInputElement.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsComponentManagerUtils.h"
@@ -141,7 +144,7 @@ private:
     static void Encode(void *data);
     nsresult SetupTheoraStream();
     nsresult SetupVorbisStream();
-    nsresult CreateFile(nsACString& file);
+    nsresult CreateFile(nsIDOMDocument *doc, nsIDOMFile **file);
 
     static MediaRecorder *gMediaRecordingService;
 
