@@ -39,6 +39,11 @@
 
 #include "IMediaRecorder.h"
 
+#ifdef _MSC_VER
+#include "windows.h"
+#include "stdio.h"
+#endif
+
 #include <time.h>
 #include <ogg/ogg.h>
 #include <portaudio.h>
