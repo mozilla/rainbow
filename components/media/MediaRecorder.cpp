@@ -422,7 +422,6 @@ MediaRecorder::AudioCallback(const void *input, void *output,
 nsresult
 MediaRecorder::Init()
 {
-    nsresult rv;
     a_rec = PR_FALSE;
     v_rec = PR_FALSE;
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
@@ -466,13 +465,6 @@ MediaRecorder::Init()
             fprintf(stderr, "Failed vidcap_src_list_get()\n");
             return NS_ERROR_FAILURE;
         }
-
-        rv = MakePipe(
-            getter_AddRefs(vState->vPipeIn),
-            getter_AddRefs(vState->vPipeOut)
-        );
-        if (NS_FAILED(rv))
-            return rv;
     }
     
     /* Setup audio */
@@ -487,15 +479,7 @@ MediaRecorder::Init()
         /* No audio capture device available */
         PR_Free(aState);
         aState = nsnull;
-    } else {
-        rv = MakePipe(
-            getter_AddRefs(aState->aPipeIn),
-            getter_AddRefs(aState->aPipeOut)
-        );
-        if (NS_FAILED(rv))
-            return rv;
-    }
-    
+    }    
     return NS_OK;   
 }
 
@@ -738,6 +722,12 @@ MediaRecorder::Start(
             return NS_ERROR_FAILURE;
         }
         SetupTheoraStream();
+
+        rv = MakePipe(
+            getter_AddRefs(vState->vPipeIn),
+            getter_AddRefs(vState->vPipeOut)
+        );
+        if (NS_FAILED(rv)) return rv;
     }
 
     /* Get ready for audio! */
@@ -768,6 +758,12 @@ MediaRecorder::Start(
             return NS_ERROR_FAILURE;
         }
         SetupVorbisStream();
+
+        rv = MakePipe(
+            getter_AddRefs(aState->aPipeIn),
+            getter_AddRefs(aState->aPipeOut)
+        );
+        if (NS_FAILED(rv)) return rv;
     }
 
     /* Let's DO this. */
