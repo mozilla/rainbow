@@ -38,10 +38,8 @@
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-const ALLOWED_DOMAINS = [
-    "http://localhost",
-    "https://localhost"
-];
+const PREFNAME = "allowedDomains";
+const DEFAULT_DOMAINS = ["http://localhost"];
 
 let RainbowInjector = {
     get _media() {
@@ -100,6 +98,14 @@ let RainbowObserver = {
                 getService(Components.interfaces.nsIObserverService);
     },
 
+    get _prefs() {
+        delete this._prefs;
+        return this._prefs =
+            Components.classes["@mozilla.org/preferences-service;1"].
+                getService(Ci.nsIPrefService).getBranch("extensions.rainbow.").
+                    QueryInterface(Ci.nsIPrefBranch2);
+    },
+
     QueryInterface: XPCOMUtils.generateQI([
         Components.interfaces.nsIObserver,
     ]),
@@ -117,7 +123,13 @@ let RainbowObserver = {
     },
 
     observe: function(subject, topic, data) {
-        ALLOWED_DOMAINS.forEach(function(domain) {
+        if (this._prefs.getPrefType(PREFNAME) ==
+            Ci.nsIPrefBranch.PREF_INVALID) {
+            this._prefs.setCharPref(PREFNAME, JSON.stringify(DEFAULT_DOMAINS));
+        }
+
+        let domains = JSON.parse(this._prefs.getCharPref(PREFNAME));
+        domains.forEach(function(domain) {
             if (data === domain)
                 RainbowInjector.inject(subject);
         });
