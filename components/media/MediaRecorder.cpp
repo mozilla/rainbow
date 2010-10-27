@@ -347,8 +347,9 @@ audio_enc:
         } else if (rd != (PRUint32)a_frame_size) {
             /* Hmm. I sure hope this is the end of the recording. */
             PR_Free(a_frame);
-            fprintf(stderr,
-                "only read %u of %d from audio pipe\n", rd, a_frame_size);
+            if (!mr->a_stp)
+                fprintf(stderr,
+                    "only read %u of %d from audio pipe\n", rd, a_frame_size);
             return;
         }
           

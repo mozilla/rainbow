@@ -21,9 +21,9 @@
     let but = document.getElementById("tehbutton");
     let ctx = document.getElementById("tehcanvas").getContext("2d");
 
-    img.src = "colorful.png";
+    img.src = "rainbow.png";
     img.onload = function() {
-        ctx.drawImage(img, 120, 0);
+        ctx.drawImage(img, 192, 112);
     }
 
     but.onclick = function() {
@@ -32,7 +32,7 @@
             Fi = Sr.stop();
             Re = false;
             but.value = "Start!";
-            ctx.drawImage(img, 120, 0);
+            ctx.drawImage(img, 192, 112);
             msg.innerHTML = "Your video was recorded to: " + Fi;
             // The path is useless. Access the actual file with:
             // fil.files[0].name, fil.files[0].size, fil.files[0].type etc.

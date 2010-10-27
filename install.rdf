@@ -5,7 +5,7 @@
     <creator>Mozilla Labs</creator>
     <description>An Audio-Visual Experiment in the Browser</description>
     <homepageURL>https://mozillalabs.com/</homepageURL>
-    <iconURL>https://mozillalabs.com/wp-content/themes/labs_project/img/default-header.png</iconURL>
+    <iconURL>chrome://rainbow/content/rainbow.png</iconURL>
     <id>rainbow@labs.mozilla</id>
 
     <name>Mozilla Labs: Rainbow</name>
