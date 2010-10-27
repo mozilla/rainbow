@@ -78,6 +78,11 @@ ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
   headers += -I../../lib/Darwin_i386-gcc3/include
+  
+  ifeq ($(debug),1)
+    cppflags += -g -DDEBUG
+  endif
+
   cppflags += -c -pipe -Os -arch i386 -dynamiclib -DMOZ_NO_MOZALLOC \
     -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -fshort-wchar -fpascal-strings -pthread \
@@ -107,15 +112,25 @@ ifeq ($(os), WINNT)
   libdirs := $(patsubst %,-LIBPATH:%,$(libdirs))
   libs := $(patsubst %,$(sdkdir)/lib/%.lib,$(libs))
   headers += -I../../lib/WINNT_x86-msvc/include
-  cppflags += -c -nologo -O1 -GR- -TP -MT -Zc:wchar_t- -W3 -Gy $(headers) \
-    -DNDEBUG -DTRIMMED -D_CRT_SECURE_NO_DEPRECATE=1 \
+
+  ifeq ($(debug),1)
+    cppflags += -MTd -DDEBUG
+    ldops = msvcrtd.lib \
+        /NODEFAULTLIB:libcmt /NODEFAULTLIB:msvcrt /NODEFAULTLIB:libcmtd
+  else
+    cppflags += -MT
+    ldops = msvcrt.lib /NODEFAULTLIB:libcmt
+  endif
+
+  cppflags += -c -nologo -O1 -GR- -TP -Zc:wchar_t- -W3 -Gy $(headers) \
+    -DTRIMMED -D_CRT_SECURE_NO_DEPRECATE=1 \
     -D_CRT_NONSTDC_NO_DEPRECATE=1 -DWINVER=0x500 -D_WIN32_WINNT=0x500 \
     -D_WIN32_IE=0x0500 -DX_DISPLAY_MISSING=1 -DMOZILLA_VERSION=\"1.9pre\" \
     -DMOZILLA_VERSION_U=1.9pre -DHAVE_SNPRINTF=1 -D_WINDOWS=1 -D_WIN32=1 \
     -DWIN32=1 -DXP_WIN=1 -DXP_WIN32=1 -DHW_THREADS=1 -DSTDC_HEADERS=1 \
     -DWIN32_LEAN_AND_MEAN=1 -DNO_X11=1 -DHAVE_MMINTRIN_H=1 \
     -DHAVE_OLEACC_IDL=1 -DHAVE_ATLBASE_H=1 -DHAVE_WPCAPI_H=1 -D_X86_=1 \
-    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1
+    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1 
   ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS -NXCOMPAT -SAFESEH \
     -IMPLIB:fake.lib \
     $(libdirs) $(libs) \
@@ -124,10 +139,7 @@ ifeq ($(os), WINNT)
     ../../lib/WINNT_x86-msvc/libtheora.lib \
     ../../lib/WINNT_x86-msvc/portaudio.lib \
     ../../lib/WINNT_x86-msvc/libvidcap.lib \
-    strmiids.lib comsuppw.lib msvcrt.lib /NODEFAULTLIB:msvcrt \
-    #msvcrt.lib 
-    #kernel32.lib user32.lib gdi32.lib winmm.lib \
-    #wsock32.lib advapi32.lib 
+    strmiids.lib comsuppw.lib $(ldops) 
 rcflags := -r $(headers)
 endif
 endif
