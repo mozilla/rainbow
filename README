@@ -1,0 +1,88 @@
+------------
+Introduction
+------------
+Rainbow is an early prototype that provides video and audio capture
+capabilities to web pages. It is currently distributed as a highly experimental
+Firefox addon.
+
+Rainbow uses libvidcap[1] to capture video, portaudio[2] to capture audio and
+libraries from xiph[3] to encode them. These libraries are cross-platform,
+but for the initial release we only support Minefield on 32-bit Macs.
+
+[1] http://libvidcap.sourceforge.net/
+[2] http://www.portaudio.com/
+[3] http://www.xiph.org/
+
+--------
+Building
+--------
+If you wish to build the binary components yourself, fetch a recent build of
+the Gecko2 SDK from:
+    http://ftp.mozilla.org/pub/mozilla.org/xulrunner/nightly/latest-trunk/
+After extracting, set the MOZSDKDIR environment variable to point to it and
+simply run `make'.
+
+Precompiled versions are of the dependencies are already included for
+convenience, however if you wish to include custom versions of libvidcap,
+libportaudio, libogg, libvorbis or libtheora; place them in the appropriate
+directory in lib/ and the build system will automatically link with them.
+
+You may set debug=1 to create a version of the XPCOM component with debugging
+symbols.
+
+-------------
+Common Errors
+-------------
+"Error: Permission denied for <http://localhost> to call method
+    UnnamedClass.toString on <>.
+ Error: uncaught exception: unknown (can't convert to string)"
+
+This usually means that a device to record audio or video was not found. If you
+look at the command line (stderr) you will find a clearer error message. We need
+to propogate this type of error correctly to JS.
+
+"Error: window.navigator.service is undefined"
+
+This can mean one of two things:
+
+- You tried to access the API from a webpage hosted on a restricted domain.
+  By default, Rainbow will only allow access to web pages served from localhost,
+  but you may change that by adding more domains to the
+    'extensions.rainbow.allowedDomains'
+  preference through about:config. The value is simply a JSON array of domains.
+
+- The binary component itself failed to load. This may because you are using
+  an older version of Firefox, or that you are running the nightly on an
+  unsupported platform (see below). If this is the case the error will be
+  preceded by something like:
+
+"Error: Components.classes['@labs.mozilla.com/media/recorder;1'] is undefined"
+
+-----------
+64-bit Macs
+-----------
+libvidcap uses a deprecated Quicktime API to capture video, which is unsupported
+on 64-bit versions of Snow Leopard. Unfortunately our nightlies are universal
+binaries, and in most cases will run in 64-bit mode, resulting in our binary
+component remaining unloaded.
+
+The correct way to fix this would be to update libvidcap to use the newer
+Quicktime API, but that is not trivial because the new APIs are Objective-C
+only. In the meantime, one can force Minefield to run in 32-bit mode as follows:
+
+$ arch -i386 /Applications/Minefield.app/Contents/MacOS/firefox-bin
+
+-----------------------
+Linux & Windows Support
+-----------------------
+All the libraries Rainbow depends on are "cross-platform", but building static
+versions of them are kind of a pain. There are preliminary versions of them
+in lib/ but:
+
+- On Windows, video recording crashes as soon as painting on the canvas starts.
+- On Linux, no devices are detected. This is presumably because portaudio was
+  built without ALSA and JACK support, and libvidcap uses V4L as the backend.
+
+In addition, on Windows libvidcap uses a deprecated version of the DirectX API.
+This may be reason enough to rewrite libvidcap backends for both Windows & Mac.
+ 
