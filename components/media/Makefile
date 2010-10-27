@@ -13,7 +13,14 @@ ifeq ($(sys), MINGW32_NT-6.1)
   cxx = cl
   so = dll
 else
+ifeq ($(sys), Linux)
+  os = Linux
+  compiler = gcc
+  cxx = g++
+  so = so
+else
   $(error Sorry, your os is unknown/unsupported: $(sys))
+endif
 endif
 endif
 
@@ -29,7 +36,11 @@ else
 ifeq ($(machine), i686)
   arch = x86
 else
+ifeq ($(machine), x86_64)
+  arch = x86
+else
   $(error: Sorry, your architecture is unknown/unsupported: $(machine))
+endif
 endif
 endif
 endif
@@ -141,6 +152,36 @@ ifeq ($(os), WINNT)
     ../../lib/WINNT_x86-msvc/libvidcap.lib \
     strmiids.lib comsuppw.lib $(ldops) 
 rcflags := -r $(headers)
+else
+ifeq ($(os), Linux)
+  libdirs := $(patsubst %,-L%,$(libdirs))
+  libs := $(patsubst %,-l%,$(libs))
+  headers += -I../../lib/Linux_x86-gcc3/include
+  
+  ifeq ($(debug),1)
+    cppflags += -g -DDEBUG
+  endif
+
+  cppflags += -pipe -Os -shared -fshort-wchar \
+    -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
+    -fno-common -pthread -Wall -Werror -Wconversion \
+    -Wpointer-arith -Woverloaded-virtual -Wsynth \
+    -Wno-ctor-dtor-privacy -Wno-non-virtual-dtor -Wcast-align \
+    -Wno-long-long -include xpcom-config.h $(headers)
+ 
+  ldflags += -pthread -pipe -m32 \
+    -DMOZ_NO_MOZALLOC -DMOZILLA_STRICT_API \
+    -Wl,-z,defs \
+    -Wl,-rpath-link,$(sdkdir)/bin \
+    $(sdkdir)/lib/libxpcomglue_s.a \
+    $(libdirs) $(libs) -lrt \
+    ../../lib/Linux_x86-gcc3/libvidcap.a \
+    ../../lib/Linux_x86-gcc3/libportaudio.a \
+    ../../lib/Linux_x86-gcc3/libvorbis.a \
+    ../../lib/Linux_x86-gcc3/libvorbisenc.a \
+    ../../lib/Linux_x86-gcc3/libogg.a \
+    ../../lib/Linux_x86-gcc3/libtheora.a
+endif
 endif
 endif
 
@@ -180,6 +221,12 @@ ifeq ($(os), WINNT)
   $(so_target): $(idl_headers) $(cpp_objects)
 	link -OUT:$@ -PDB:$(@:.dll=.pdb) $(cpp_objects) $(ldflags)
 	chmod +x $@
+else
+ifeq ($(os), Linux)
+  $(so_target): $(idl_headers)
+	$(cxx) $(cppflags) -o $@ $(cpp_sources) $(ldflags)
+	chmod +x $@
+endif
 endif
 endif
 

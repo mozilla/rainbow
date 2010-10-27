@@ -5,7 +5,22 @@ ifeq ($(VERSION),)
   export VERSION = 0.1
 endif
 
-so_files=components/media/libmediarecorder.dylib 
+sys := $(shell uname -s)
+ifeq ($(sys), Darwin)
+  so = dylib
+else
+ifeq ($(sys), MINGW32_NT-6.1)
+  so = dll
+else
+ifeq ($(sys), Linux)
+  so = so
+else
+  $(error Sorry, your os is unknown/unsupported: $(sys))
+endif
+endif
+endif
+
+so_files=components/media/libmediarecorder.$(so)
 xpt_files=components/media/IMediaRecorder.xpt
 
 xpi_name=rainbow-$(VERSION)-dev.xpi

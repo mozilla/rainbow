@@ -306,7 +306,7 @@ MediaRecorder::Encode(void *data)
                 (const char *)v_frame, (char *)rgb
             );
             /* That didn't give us what we want. Reconfigure. */
-            int tmp = 0;
+            unsigned char tmp = 0;
             for (int j = 0; j < WIDTH * HEIGHT * 4; j += 4) {
                 tmp = rgb[j+2];
                 rgb[j+2] = rgb[j];
@@ -355,9 +355,9 @@ audio_enc:
         /* Uninterleave samples. Alternatively, have portaudio do this? */
         a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_size);
         for (i = 0; i < a_frame_len; i++){
-            a_buffer[0][i] = ((a_frame[i*4+1]<<8) |
-                (0x00ff&(int)a_frame[i*4])) / 32768.f;
-            a_buffer[1][i]=((a_frame[i*4+3]<<8) | 
+            a_buffer[0][i] = (float)((a_frame[i*4+1]<<8) |
+                ((0x00ff&(int)a_frame[i*4]))) / 32768.f;
+            a_buffer[1][i] = (float)((a_frame[i*4+3]<<8) | 
                 (0x00ff&(int)a_frame[i*4+2])) / 32768.f;
         }
         
