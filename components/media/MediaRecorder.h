@@ -71,12 +71,12 @@
 
 
 /* TODO: Make these configurable */
-#define FPS_N           10
-#define FPS_D           1
+#define FPS_N           50
+#define FPS_D           5
 #define WIDTH           640
 #define HEIGHT          480
 
-#define NUM_CHANNELS    2
+#define NUM_CHANNELS    1
 #define FRAMES_BUFFER   1024
 #define SAMPLE          PRInt16
 #define SAMPLE_RATE     22050

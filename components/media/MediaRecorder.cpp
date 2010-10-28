@@ -206,12 +206,12 @@ MediaRecorder::WriteAudio(void *data)
 void
 MediaRecorder::Encode(void *data)
 {
-    int i;
+    int i, j;
     nsresult rv;
     PRUint32 rd = 0;
 
+    char *a_frame;
     float **a_buffer;
-    signed char *a_frame;
     unsigned char *v_frame;
     th_ycbcr_buffer v_buffer;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
@@ -334,7 +334,7 @@ audio_enc:
         if (mr->a_rec) {
              
         /* Make sure we get enough frames in unless we're at the end */
-        a_frame = (signed char *) PR_Calloc(1, a_frame_size);
+        a_frame = (char *) PR_Calloc(1, a_frame_size);
 
         do mr->aState->aPipeIn->Available(&rd);
             while ((rd < (PRUint32)a_frame_size) && !mr->a_stp);
@@ -356,10 +356,12 @@ audio_enc:
         /* Uninterleave samples. Alternatively, have portaudio do this? */
         a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_size);
         for (i = 0; i < a_frame_len; i++){
-            a_buffer[0][i] = (float)((a_frame[i*4+1]<<8) |
-                ((0x00ff&(int)a_frame[i*4]))) / 32768.f;
-            a_buffer[1][i] = (float)((a_frame[i*4+3]<<8) | 
-                (0x00ff&(int)a_frame[i*4+2])) / 32768.f;
+            for (j = 0; j < NUM_CHANNELS; j++) {
+                a_buffer[j][i] =
+                    (float)((a_frame[i*mr->aState->fsize+((j*2)+1)]<<8) |
+                        ((0x00ff&(int)a_frame[i*mr->aState->fsize+(j*2)]))) /
+                            32768.f;
+            }
         }
         
         /* Tell libvorbis to do its thing */
@@ -408,7 +410,7 @@ MediaRecorder::AudioCallback(const void *input, void *output,
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
 
     /* Write to pipe and return quickly */
-    size = frames * NUM_CHANNELS * sizeof(SAMPLE);
+    size = frames * mr->aState->fsize;
     rv = mr->aState->aPipeOut->Write(
         (const char *)input, size, &wr
     );
