@@ -71,8 +71,8 @@
 
 
 /* TODO: Make these configurable */
-#define FPS_N           50
-#define FPS_D           5
+#define FPS_N           12
+#define FPS_D           1
 #define WIDTH           640
 #define HEIGHT          480
 
