@@ -30,20 +30,6 @@ directory in lib/ and the build system will automatically link with them.
 You may set debug=1 to create a version of the XPCOM component with debugging
 symbols.
 
---------------
-Video Playback
---------------
-Ironically enough, it appears as if (Google) Chrome's Ogg decoder is one of the
-only players to playback video AND audio recorded using Rainbow. Firefox plays
-back the video just fine, but fails to detect the audio track. Mplayer works
-the  best (even seeking works!), on the other hand VLC fails at playing back
-either video or audio.
-
-This is definitely something to do with how we're multiplexing theora and
-vorbis. Mplayer and Chrome's decoders are presumably tolerant to the way we're
-doing it. Further investigation is required, at the very least Firefox should
-be able to playback what Rainbow records faithfully :)
-
 -------------
 Common Errors
 -------------
@@ -99,4 +85,18 @@ in lib/ but:
 
 In addition, on Windows libvidcap uses a deprecated version of the DirectX API.
 This may be reason enough to rewrite libvidcap backends for both Windows & Mac.
- 
+
+-------------------------------
+Video Playback (Fixed on HEAD!)
+-------------------------------
+Ironically enough, it appears as if (Google) Chrome's Ogg decoder is one of the
+only players to playback video AND audio recorded using Rainbow. Firefox plays
+back the video just fine, but fails to detect the audio track. Mplayer works
+the  best (even seeking works!), on the other hand VLC fails at playing back
+either video or audio.
+
+This is definitely something to do with how we're multiplexing theora and
+vorbis. Mplayer and Chrome's decoders are presumably tolerant to the way we're
+doing it. Further investigation is required, at the very least Firefox should
+be able to playback what Rainbow records faithfully :)
+

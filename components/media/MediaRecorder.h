@@ -139,11 +139,13 @@ private:
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
 
-    static void Encode(void *data);
-    nsresult SetupTheoraStream();
-    nsresult SetupVorbisStream();
+    nsresult SetupTheoraBOS();
+    nsresult SetupVorbisBOS();
+    nsresult SetupTheoraHeaders();
+    nsresult SetupVorbisHeaders();
     nsresult CreateFile(nsIDOMHTMLInputElement *input, nsACString &file);
 
+    static void Encode(void *data);
     static MediaRecorder *gMediaRecordingService;
 
 protected:

@@ -499,12 +499,11 @@ MediaRecorder::~MediaRecorder()
 }
 
 /*
- * Theora init header
+ * Theora beginning of stream
  */
 nsresult
-MediaRecorder::SetupTheoraStream()
+MediaRecorder::SetupTheoraBOS()
 {
-    int ret;
     if (ogg_stream_init(&vState->os, rand())) {
         fprintf(stderr, "Failed ogg_stream_init!\n");
         return NS_ERROR_FAILURE;
@@ -550,7 +549,18 @@ MediaRecorder::SetupTheoraStream()
     fwrite(vState->og.header, 1, vState->og.header_len, outfile);
     fwrite(vState->og.body, 1, vState->og.body_len, outfile);
 
-    /* Create remaining theora headers */
+    return NS_OK;
+}
+
+/*
+ * Theora stream headers
+ */
+nsresult
+MediaRecorder::SetupTheoraHeaders()
+{
+    int ret;
+
+    /* Create rest of the theora headers */
     for (;;) {
         ret = th_encode_flushheader(
             vState->th, &vState->tc, &vState->op
@@ -577,10 +587,10 @@ MediaRecorder::SetupTheoraStream()
 }
 
 /*
- * Vorbis init header
+ * Vorbis beginning of stream
  */
 nsresult
-MediaRecorder::SetupVorbisStream()
+MediaRecorder::SetupVorbisBOS()
 {
     int ret;
     if (ogg_stream_init(&aState->os, rand())) {
@@ -615,10 +625,27 @@ MediaRecorder::SetupVorbisStream()
         ogg_stream_packetin(&aState->os, &header_comm);
         ogg_stream_packetin(&aState->os, &header_code);
 
-        while ((ret = ogg_stream_flush(&aState->os, &aState->og)) != 0) {
-            fwrite(aState->og.header, 1, aState->og.header_len, outfile) ;
-            fwrite(aState->og.body, 1, aState->og.body_len, outfile);
+        if (ogg_stream_pageout(&aState->os, &aState->og) != 1) {
+            fprintf(stderr,"Internal Ogg library error.\n");
+            return NS_ERROR_FAILURE;
         }
+        fwrite(aState->og.header, 1, aState->og.header_len, outfile);
+        fwrite(aState->og.body, 1, aState->og.body_len, outfile);
+    }
+
+    return NS_OK;
+}
+
+/*
+ * Setup vorbis stream headers
+ */
+nsresult
+MediaRecorder::SetupVorbisHeaders()
+{
+    int ret;
+    while ((ret = ogg_stream_flush(&aState->os, &aState->og)) != 0) {
+        fwrite(aState->og.header, 1, aState->og.header_len, outfile);
+        fwrite(aState->og.body, 1, aState->og.body_len, outfile);
     }
 
     return NS_OK;
@@ -723,7 +750,7 @@ MediaRecorder::Start(
             fprintf(stderr, "Failed vidcap_format_bind()\n");
             return NS_ERROR_FAILURE;
         }
-        SetupTheoraStream();
+        SetupTheoraBOS();
 
         rv = MakePipe(
             getter_AddRefs(vState->vPipeIn),
@@ -759,7 +786,7 @@ MediaRecorder::Start(
             fprintf(stderr, "Could not open stream! %d", err);
             return NS_ERROR_FAILURE;
         }
-        SetupVorbisStream();
+        SetupVorbisBOS();
 
         rv = MakePipe(
             getter_AddRefs(aState->aPipeIn),
@@ -770,6 +797,7 @@ MediaRecorder::Start(
 
     /* Let's DO this. */
     if (video) {
+        SetupTheoraHeaders();
         if (vidcap_src_capture_start(
                 vState->source, MediaRecorder::VideoCallback, this)) {
             fprintf(stderr, "Failed vidcap_src_capture_start()\n");
@@ -779,6 +807,7 @@ MediaRecorder::Start(
         v_stp = PR_FALSE;
     }
     if (audio) {
+        SetupVorbisHeaders();
         if (Pa_StartStream(aState->stream) != paNoError) {
             fprintf(stderr, "Could not start stream!");
             return NS_ERROR_FAILURE;
