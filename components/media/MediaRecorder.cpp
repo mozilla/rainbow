@@ -168,6 +168,69 @@ MakePipe(nsIAsyncInputStream **pipeIn,
     return NS_OK;
 }
 
+/* 
+ * Convert RGB32 to i420. NOTE: size of dest must be >= width * height * 3 / 2
+ * Based on formulas found at http://en.wikipedia.org/wiki/YUV  (libvidcap)
+ */
+static int
+RGB32toI420(int width, int height, const char *src, char *dst)
+{
+    int i, j;
+    unsigned char *dst_y_even;
+    unsigned char *dst_y_odd;
+    unsigned char *dst_u;
+    unsigned char *dst_v;
+    const unsigned char *src_even;
+    const unsigned char *src_odd;
+
+    src_even = (const unsigned char *)src;
+    src_odd = src_even + width * 4;
+
+    dst_y_even = (unsigned char *)dst;
+    dst_y_odd = dst_y_even + width;
+    dst_u = dst_y_even + width * height;
+    dst_v = dst_u + ((width * height) >> 2);
+
+    for (i = 0; i < height / 2; ++i) {
+        for (j = 0; j < width / 2; ++j) {
+            short r, g, b;
+            b = *src_even++;
+            g = *src_even++;
+            r = *src_even++;
+            ++src_even;
+            *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+
+            *dst_u++ = (( r * -38 - g * 74 + b * 112 + 128 ) >> 8 ) + 128;
+            *dst_v++ = (( r * 112 - g * 94 - b * 18 + 128 ) >> 8 ) + 128;
+
+            b = *src_even++;
+            g = *src_even++;
+            r = *src_even++;
+            ++src_even;
+            *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+
+            b = *src_odd++;
+            g = *src_odd++;
+            r = *src_odd++;
+            ++src_odd;
+            *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+
+            b = *src_odd++;
+            g = *src_odd++;
+            r = *src_odd++;
+            ++src_odd;
+            *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+        }
+
+        dst_y_odd += width;
+        dst_y_even += width;
+        src_odd += width * 4;
+        src_even += width * 4;
+    }
+
+    return 0;
+}
+
 /*
  * === Here's the meat of the code. Static callbacks & encoder ===
  */
@@ -268,6 +331,10 @@ MediaRecorder::Encode(void *data)
             return;
         }
 
+        /* Convert RGB32 to i420 */
+        unsigned char *i420 = (unsigned char *)PR_Calloc(WIDTH * HEIGHT * 3 / 2, 1);
+        RGB32toI420(WIDTH, HEIGHT, (const char *)v_frame, (char *)i420);
+
         /* Convert i420 to YCbCr */
         v_buffer[0].width = WIDTH;
         v_buffer[0].stride = WIDTH;
@@ -281,8 +348,8 @@ MediaRecorder::Encode(void *data)
         v_buffer[2].height = v_buffer[1].height;
         v_buffer[2].stride = v_buffer[1].stride;
 
-        v_buffer[0].data = v_frame;
-        v_buffer[1].data = v_frame + WIDTH * HEIGHT;
+        v_buffer[0].data = i420;
+        v_buffer[1].data = i420 + WIDTH * HEIGHT;
         v_buffer[2].data = v_buffer[1].data + WIDTH * HEIGHT / 4;
 
         /* Encode 'er up */
@@ -294,28 +361,19 @@ MediaRecorder::Encode(void *data)
             fprintf(stderr, "Could not read packet!\n");
             return;
         }
-
+        
         /* Write to canvas, if needed. Move to another thread? */
         if (mr->vState->vCanvas) {
-            unsigned char *rgb = (unsigned char *)
-                PR_Calloc(1, WIDTH * HEIGHT * 4);
-
-            /* Canvas wants rgba. */
-            vidcap_i420_to_rgb32(
-                WIDTH, HEIGHT,
-                (const char *)v_frame, (char *)rgb
-            );
-            /* That didn't give us what we want. Reconfigure. */
+            /* Looks like libvidcap gives as BGRA but we want RGBA */
             unsigned char tmp = 0;
             for (int j = 0; j < WIDTH * HEIGHT * 4; j += 4) {
-                tmp = rgb[j+2];
-                rgb[j+2] = rgb[j];
-                rgb[j] = tmp;
+                tmp = v_frame[j+2];
+                v_frame[j+2] = v_frame[j];
+                v_frame[j] = tmp;
             }
             rv = mr->vState->vCanvas->PutImageData_explicit(
-                0, 0, WIDTH, HEIGHT, rgb, WIDTH * HEIGHT * 4
+                0, 0, WIDTH, HEIGHT, v_frame, WIDTH * HEIGHT * 4
             );
-            PR_Free((void *)rgb);
         }
 
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
@@ -383,22 +441,6 @@ audio_enc:
  * Return as quickly as possible! We use nsIPipe to store data.
  */
 int
-MediaRecorder::VideoCallback(vidcap_src *src, void *data,
-    struct vidcap_capture_info *video)
-{
-    nsresult rv;
-    PRUint32 wr;
-    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
-    
-    /* Write to pipe and return quickly */
-    rv = mr->vState->vPipeOut->Write(
-        (const char *)video->video_data,
-        video->video_data_size, &wr
-    );
-    return 0;
-}
-
-int
 MediaRecorder::AudioCallback(const void *input, void *output,
         unsigned long frames,
         const PaStreamCallbackTimeInfo* timeInfo,
@@ -428,47 +470,12 @@ MediaRecorder::Init()
     v_rec = PR_FALSE;
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
-
-    /* Setup frame sizes */
-    vState->fsize = WIDTH * HEIGHT * 3 / 2;
-    aState->fsize = sizeof(SAMPLE) * NUM_CHANNELS;
-
-    /* Setup video */
-    int nDevices = 0;
-    struct vidcap_sapi_info sapi_info;
-    if (!(vState->state = vidcap_initialize())) {
-        fprintf(stderr, "Could not initialize vidcap, aborting!\n");
-        return NS_ERROR_FAILURE;
-    }
-    if (!(vState->sapi = vidcap_sapi_acquire(vState->state, 0))) {
-        fprintf(stderr, "Failed to acquire default sapi\n");
-        return NS_ERROR_FAILURE;
-    }
-    if (vidcap_sapi_info_get(vState->sapi, &sapi_info)) {
-        fprintf(stderr, "Failed to get default sapi info\n");
-        return NS_ERROR_FAILURE;
-    }
-    nDevices = vidcap_src_list_update(vState->sapi);
-    if (nDevices < 0) {
-        fprintf(stderr, "Failed vidcap_src_list_update()\n");
-        return NS_ERROR_FAILURE;
-    } else if (nDevices == 0) {
-        /* No video capture device available */
-        PR_Free(vState);
-        vState = nsnull;
-    } else {
-        if (!(vState->sources = (struct vidcap_src_info *)
-            PR_Calloc(nDevices, sizeof(struct vidcap_src_info)))) {
-            return NS_ERROR_OUT_OF_MEMORY;
-        }
-        if (vidcap_src_list_get(
-                vState->sapi, nDevices, vState->sources)) {
-            PR_Free(vState->sources);
-            fprintf(stderr, "Failed vidcap_src_list_get()\n");
-            return NS_ERROR_FAILURE;
-        }
-    }
     
+    /* Setup video */
+    #ifdef XP_MAC
+    vState->backend = new VideoSourceMac();
+    #endif
+
     /* Setup audio */
     aState->stream = NULL;
     if (Pa_Initialize() != paNoError) {
@@ -488,13 +495,7 @@ MediaRecorder::Init()
 MediaRecorder::~MediaRecorder()
 {
     Pa_Terminate();
-    vidcap_sapi_release(vState->sapi);
-    vidcap_destroy(vState->state);
-
-    PR_Free(vState->sources);
-    PR_Free(vState);
     PR_Free(aState);
-
     gMediaRecordingService = nsnull;
 }
 
@@ -724,34 +725,21 @@ MediaRecorder::Start(
         return NS_ERROR_FAILURE;
     }
 
+    /* Setup frame sizes */
+    vState->fsize = WIDTH * HEIGHT * 4;
+    aState->fsize = sizeof(SAMPLE) * NUM_CHANNELS;
+
     rv = CreateFile(input, file);
     if (NS_FAILED(rv)) return rv;
 
     /* Get ready for video! */
     if (video) {
-        struct vidcap_fmt_info fmt_info;
-        fmt_info.width = WIDTH;
-        fmt_info.height = HEIGHT;
-        /* FIXME: What would be the best format to record in? */
-        fmt_info.fourcc = VIDCAP_FOURCC_I420;
-        fmt_info.fps_numerator = FPS_N;
-        fmt_info.fps_denominator = FPS_D;
+        vState->backend->SetOptions(FPS_N, FPS_D, WIDTH, HEIGHT);
 
-        if (!(vState->source = vidcap_src_acquire(
-            vState->sapi, &vState->sources[0]))) {
-            fprintf(stderr, "Failed vidcap_src_acquire()\n");
-            return NS_ERROR_FAILURE;
-        }
-        if (video && ctx) {
+        if (ctx) {
             vState->vCanvas = ctx;
         }
-        
-        if (vidcap_format_bind(vState->source, &fmt_info)) {
-            fprintf(stderr, "Failed vidcap_format_bind()\n");
-            return NS_ERROR_FAILURE;
-        }
         SetupTheoraBOS();
-
         rv = MakePipe(
             getter_AddRefs(vState->vPipeIn),
             getter_AddRefs(vState->vPipeOut)
@@ -798,11 +786,8 @@ MediaRecorder::Start(
     /* Let's DO this. */
     if (video) {
         SetupTheoraHeaders();
-        if (vidcap_src_capture_start(
-                vState->source, MediaRecorder::VideoCallback, this)) {
-            fprintf(stderr, "Failed vidcap_src_capture_start()\n");
-            return NS_ERROR_FAILURE;
-        }
+        rv = vState->backend->Start(vState->vPipeOut);
+        if (NS_FAILED(rv)) return rv;
         v_rec = PR_TRUE;
         v_stp = PR_FALSE;
     }
@@ -835,17 +820,16 @@ MediaRecorder::Start(
 NS_IMETHODIMP
 MediaRecorder::Stop()
 {
+    nsresult rv;
+
     if (!a_rec && !v_rec) {
         fprintf(stderr, "No recording in progress!\n");
         return NS_ERROR_FAILURE;    
     }
 
     if (v_rec) {
-        if (vidcap_src_capture_stop(vState->source)) {
-            fprintf(stderr, "Failed vidcap_src_capture_stop()\n");
-            return NS_ERROR_FAILURE;
-        }
-        vidcap_src_release(vState->source);
+        rv = vState->backend->Stop();
+        if (NS_FAILED(rv)) return rv;
     }
     
     if (a_rec) {
