@@ -111,37 +111,6 @@ EscapeBackslash(nsACString& str)
     }
 }
 
-/*
- * Try to intelligently fetch a default audio input device
- */
-static PaDeviceIndex
-GetDefaultInputDevice()
-{
-    int i, numDevices;
-    PaDeviceIndex def;
-    const PaDeviceInfo *deviceInfo;
-    
-    numDevices = Pa_GetDeviceCount();
-    if (numDevices < 0) {
-        fprintf(stderr, "No audio devices found!\n");
-        return paNoDevice;
-    }
-    
-    /* Try default input */
-    if ((def = Pa_GetDefaultInputDevice()) != paNoDevice) {
-        return def;
-    }
-    
-    /* No luck, iterate and check for API specific input device */
-    for (i = 0; i < numDevices; i++) {
-        deviceInfo = Pa_GetDeviceInfo(i);
-        if (i == Pa_GetHostApiInfo(deviceInfo->hostApi)->defaultInputDevice) {
-            return i;
-        }
-    }
-    /* No device :( */
-    return paNoDevice;
-}
 
 /*
  * Make a pipe (since NS_NewPipe2 isn't exposed by XPCOM)
@@ -434,31 +403,6 @@ audio_enc:
     }
 }
 
-/*
- * NOTE: The following callbacks are run on high prority
- * threads. Real-time constraints apply. Don't do anything funky
- * inside (like calling non-thread-safe functions, or file I/O)
- * Return as quickly as possible! We use nsIPipe to store data.
- */
-int
-MediaRecorder::AudioCallback(const void *input, void *output,
-        unsigned long frames,
-        const PaStreamCallbackTimeInfo* timeInfo,
-        PaStreamCallbackFlags statusFlags,
-        void *data)
-{
-    nsresult rv;
-    PRUint32 wr, size;
-    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
-
-    /* Write to pipe and return quickly */
-    size = frames * mr->aState->fsize;
-    rv = mr->aState->aPipeOut->Write(
-        (const char *)input, size, &wr
-    );
-
-    return paContinue;
-}
 
 /*
  * === Class methods begin now! ===
@@ -470,31 +414,12 @@ MediaRecorder::Init()
     v_rec = PR_FALSE;
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
-    
-    /* Setup video */
-    #ifdef XP_MAC
-    vState->backend = new VideoSourceMac();
-    #endif
-
-    /* Setup audio */
-    aState->stream = NULL;
-    if (Pa_Initialize() != paNoError) {
-        fprintf(stderr, "Could not initialize PortAudio!\n");
-        return NS_ERROR_FAILURE;
-    }
-    aState->source = GetDefaultInputDevice();
-    
-    if (aState->source == paNoDevice) {
-        /* No audio capture device available */
-        PR_Free(aState);
-        aState = nsnull;
-    }    
     return NS_OK;   
 }
 
 MediaRecorder::~MediaRecorder()
 {
-    Pa_Terminate();
+    PR_Free(vState);
     PR_Free(aState);
     gMediaRecordingService = nsnull;
 }
@@ -716,6 +641,11 @@ MediaRecorder::Start(
         fprintf(stderr, "Recording in progress!\n");
         return NS_ERROR_FAILURE;
     }
+
+    vState->backend = new VideoSourceMac();
+    aState->backend = new AudioSourceAll();
+
+    /* FIXME: device detection TBD */
     if (audio && (aState == nsnull)) {
         fprintf(stderr, "Audio requested but no devices found!\n");
         return NS_ERROR_FAILURE;
@@ -749,33 +679,9 @@ MediaRecorder::Start(
 
     /* Get ready for audio! */
     if (audio) {
-        PaError err;
-        PaStreamParameters param;    
+        aState->backend->SetOptions(NUM_CHANNELS, SAMPLE_RATE, SAMPLE_QUALITY);
 
-        param.device = aState->source;
-        param.channelCount = NUM_CHANNELS;
-        param.sampleFormat = SAMPLE_FORMAT;
-        param.suggestedLatency =
-            Pa_GetDeviceInfo(aState->source)->defaultLowInputLatency;
-        param.hostApiSpecificStreamInfo = NULL;
-
-        err = Pa_OpenStream(
-                &aState->stream,
-                &param,
-                NULL,
-                SAMPLE_RATE,
-                FRAMES_BUFFER,
-                paClipOff,
-                MediaRecorder::AudioCallback,
-                this
-        );
-
-        if (err != paNoError) {
-            fprintf(stderr, "Could not open stream! %d", err);
-            return NS_ERROR_FAILURE;
-        }
         SetupVorbisBOS();
-
         rv = MakePipe(
             getter_AddRefs(aState->aPipeIn),
             getter_AddRefs(aState->aPipeOut)
@@ -793,10 +699,8 @@ MediaRecorder::Start(
     }
     if (audio) {
         SetupVorbisHeaders();
-        if (Pa_StartStream(aState->stream) != paNoError) {
-            fprintf(stderr, "Could not start stream!");
-            return NS_ERROR_FAILURE;
-        }
+        rv = aState->backend->Start(aState->aPipeOut);
+        if (NS_FAILED(rv)) return rv;
         a_rec = PR_TRUE;
         a_stp = PR_FALSE;
     }
@@ -833,10 +737,8 @@ MediaRecorder::Stop()
     }
     
     if (a_rec) {
-        if (Pa_StopStream(aState->stream) != paNoError) {
-            fprintf(stderr, "Could not close stream!\n");
-            return NS_ERROR_FAILURE;
-        }
+        rv = aState->backend->Stop();
+        if (NS_FAILED(rv)) return rv;
     }
 
     /* Wait for encoder to finish */

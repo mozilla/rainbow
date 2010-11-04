@@ -45,7 +45,6 @@
 
 #include <stdio.h>
 #include <ogg/ogg.h>
-#include <portaudio.h>
 #include <vorbis/vorbisenc.h>
 #include <theora/theoraenc.h>
 
@@ -63,15 +62,12 @@
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 /* ifdefs are evil, but I am powerless */
+#include "AudioSource.h"
 #include "VideoSourceMac.h"
 
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
 #define MEDIA_RECORDER_CID { 0xc467b1f4, 0x551c, 0x4e2f, \
                            { 0xa6, 0xba, 0xcb, 0x7d, 0x79, 0x2d, 0x14, 0x52 }}
-
-#define FRAMES_BUFFER   1024
-#define SAMPLE          PRInt16
-#define SAMPLE_FORMAT   paInt16
 
 /* These are defaults for otherwise configurable parameters */
 #define FPS_N           12
@@ -92,9 +88,7 @@ typedef struct {
     ogg_stream_state os;
 
     int fsize;
-    PaStream *stream;
-    PaDeviceIndex source;
-
+    AudioSource *backend;
     nsCOMPtr<nsIAsyncInputStream> aPipeIn;
     nsCOMPtr<nsIAsyncOutputStream> aPipeOut;
 } Audio;
@@ -125,7 +119,7 @@ public:
     virtual ~MediaRecorder();
     MediaRecorder(){}
 
-private:
+protected:
     FILE *outfile;
     Audio *aState;
     Video *vState;
@@ -141,16 +135,9 @@ private:
     nsresult CreateFile(nsIDOMHTMLInputElement *input, nsACString &file);
 
     static void Encode(void *data);
+    static void WriteAudio(void *data);
     static MediaRecorder *gMediaRecordingService;
 
-protected:
-    static void WriteAudio(void *data);
-    static int AudioCallback(
-        const void *input,
-        void *output, unsigned long frames,
-        const PaStreamCallbackTimeInfo* time,
-        PaStreamCallbackFlags flags, void *data
-    );
 };
 
 #endif
