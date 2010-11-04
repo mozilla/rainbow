@@ -20,8 +20,8 @@ endif
 endif
 endif
 
-so_files=components/media/libmediarecorder.$(so)
-xpt_files=components/media/IMediaRecorder.xpt
+so_files=components/libmediarecorder.$(so)
+xpt_files=components/IMediaRecorder.xpt
 
 xpi_name=rainbow-$(VERSION)-dev.xpi
 xpi_files=chrome.manifest install.rdf content/ $(so_files) $(xpt_files)
@@ -29,7 +29,7 @@ xpi_files=chrome.manifest install.rdf content/ $(so_files) $(xpt_files)
 all: xpi
 
 $(so_files) $(xpt_files):
-	$(MAKE) -C components/media
+	$(MAKE) -C components
 
 xpi: $(so_files) $(xpt_files)
 	rm -f $(TOPSRCDIR)/$(xpi_name)
@@ -37,5 +37,5 @@ xpi: $(so_files) $(xpt_files)
 
 clean:
 	rm -f $(TOPSRCDIR)/$(xpi_name)
-	$(MAKE) -C components/media clean
+	$(MAKE) -C components clean
 

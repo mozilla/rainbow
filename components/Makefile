@@ -90,7 +90,7 @@ libs := xpcomglue_s xpcom nspr4 mozalloc plds4 plc4
 ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
-  headers += -I../../lib/Darwin_i386-gcc3/include
+  headers += -I../lib/Darwin_i386-gcc3/include
   
   ifeq ($(debug),1)
     cppflags += -g -DDEBUG
@@ -106,13 +106,13 @@ ifeq ($(os), Darwin)
   ldflags += -pthread -pipe -bundle -arch i386 \
     -Wl,-executable_path,$(sdkdir)/bin \
     -Wl,-dead_strip \
-    ../../lib/Darwin_i386-gcc3/libogg.a \
-    ../../lib/Darwin_i386-gcc3/libvorbis.a \
-    ../../lib/Darwin_i386-gcc3/libvidcap.a \
-    ../../lib/Darwin_i386-gcc3/libtheora.a \
-    ../../lib/Darwin_i386-gcc3/libtheoraenc.a \
-    ../../lib/Darwin_i386-gcc3/libvorbisenc.a \
-    ../../lib/Darwin_i386-gcc3/libportaudio.a \
+    ../lib/Darwin_i386-gcc3/libogg.a \
+    ../lib/Darwin_i386-gcc3/libvorbis.a \
+    ../lib/Darwin_i386-gcc3/libvidcap.a \
+    ../lib/Darwin_i386-gcc3/libtheora.a \
+    ../lib/Darwin_i386-gcc3/libtheoraenc.a \
+    ../lib/Darwin_i386-gcc3/libvorbisenc.a \
+    ../lib/Darwin_i386-gcc3/libportaudio.a \
     -framework Carbon \
     -framework CoreAudio \
     -framework QuartzCore \
@@ -124,7 +124,7 @@ else
 ifeq ($(os), WINNT)
   libdirs := $(patsubst %,-LIBPATH:%,$(libdirs))
   libs := $(patsubst %,$(sdkdir)/lib/%.lib,$(libs))
-  headers += -I../../lib/WINNT_x86-msvc/include
+  headers += -I../lib/WINNT_x86-msvc/include
 
   ifeq ($(debug),1)
     cppflags += -MTd -DDEBUG
@@ -147,18 +147,18 @@ ifeq ($(os), WINNT)
   ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS -NXCOMPAT -SAFESEH \
     -IMPLIB:fake.lib \
     $(libdirs) $(libs) \
-    ../../lib/WINNT_x86-msvc/libogg.lib \
-    ../../lib/WINNT_x86-msvc/libvorbis.lib \
-    ../../lib/WINNT_x86-msvc/libtheora.lib \
-    ../../lib/WINNT_x86-msvc/portaudio.lib \
-    ../../lib/WINNT_x86-msvc/libvidcap.lib \
+    ../lib/WINNT_x86-msvc/libogg.lib \
+    ../lib/WINNT_x86-msvc/libvorbis.lib \
+    ../lib/WINNT_x86-msvc/libtheora.lib \
+    ../lib/WINNT_x86-msvc/portaudio.lib \
+    ../lib/WINNT_x86-msvc/libvidcap.lib \
     strmiids.lib comsuppw.lib $(ldops) 
 rcflags := -r $(headers)
 else
 ifeq ($(os), Linux)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
-  headers += -I../../lib/Linux_x86-gcc3/include
+  headers += -I../lib/Linux_x86-gcc3/include
   
   ifeq ($(debug),1)
     cppflags += -g -DDEBUG
@@ -177,12 +177,12 @@ ifeq ($(os), Linux)
     -Wl,-rpath-link,$(sdkdir)/bin \
     $(sdkdir)/lib/libxpcomglue_s.a \
     $(libdirs) $(libs) -lrt \
-    ../../lib/Linux_x86-gcc3/libvidcap.a \
-    ../../lib/Linux_x86-gcc3/libportaudio.a \
-    ../../lib/Linux_x86-gcc3/libvorbis.a \
-    ../../lib/Linux_x86-gcc3/libvorbisenc.a \
-    ../../lib/Linux_x86-gcc3/libogg.a \
-    ../../lib/Linux_x86-gcc3/libtheora.a
+    ../lib/Linux_x86-gcc3/libvidcap.a \
+    ../lib/Linux_x86-gcc3/libportaudio.a \
+    ../lib/Linux_x86-gcc3/libvorbis.a \
+    ../lib/Linux_x86-gcc3/libvorbisenc.a \
+    ../lib/Linux_x86-gcc3/libogg.a \
+    ../lib/Linux_x86-gcc3/libtheora.a
 endif
 endif
 endif
