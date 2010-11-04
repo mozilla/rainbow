@@ -62,21 +62,12 @@
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 /* ifdefs are evil, but I am powerless */
-#include "AudioSource.h"
 #include "VideoSourceMac.h"
+#include "AudioSourcePortaudio.h"
 
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
 #define MEDIA_RECORDER_CID { 0xc467b1f4, 0x551c, 0x4e2f, \
                            { 0xa6, 0xba, 0xcb, 0x7d, 0x79, 0x2d, 0x14, 0x52 }}
-
-/* These are defaults for otherwise configurable parameters */
-#define FPS_N           12
-#define FPS_D           1
-#define WIDTH           640
-#define HEIGHT          480
-#define NUM_CHANNELS    1
-#define SAMPLE_RATE     22050
-#define SAMPLE_QUALITY  (float)(0.4)
 
 typedef struct {
     ogg_page og;
@@ -87,7 +78,6 @@ typedef struct {
     vorbis_dsp_state vd;
     ogg_stream_state os;
 
-    int fsize;
     AudioSource *backend;
     nsCOMPtr<nsIAsyncInputStream> aPipeIn;
     nsCOMPtr<nsIAsyncOutputStream> aPipeOut;
@@ -101,7 +91,6 @@ typedef struct {
     th_enc_ctx *th;
     ogg_stream_state os;
     
-    int fsize;
     VideoSource *backend;
     nsCOMPtr<nsIAsyncInputStream> vPipeIn;
     nsCOMPtr<nsIAsyncOutputStream> vPipeOut;

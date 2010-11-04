@@ -272,18 +272,20 @@ MediaRecorder::Encode(void *data)
      * run of the loop?
      */
     int a_frame_len = SAMPLE_RATE/(FPS_N/FPS_D);
-    int a_frame_size = a_frame_len * mr->aState->fsize;
-            
+    int v_frame_size = mr->vState->backend->GetFrameSize();
+    int a_frame_size = mr->aState->backend->GetFrameSize();
+    int a_frame_total = a_frame_len * a_frame_size;
+
     for (;;) {
 
         if (mr->v_rec) {
 
         /* Make sure we get 1 full frame of video */
-        v_frame = (unsigned char *) PR_Calloc(1, mr->vState->fsize);
+        v_frame = (unsigned char *) PR_Calloc(1, v_frame_size);
 
         do mr->vState->vPipeIn->Available(&rd);
-            while ((rd < (PRUint32)mr->vState->fsize) && !mr->v_stp);
-        rv = mr->vState->vPipeIn->Read((char *)v_frame, mr->vState->fsize, &rd);
+            while ((rd < (PRUint32)v_frame_size) && !mr->v_stp);
+        rv = mr->vState->vPipeIn->Read((char *)v_frame, v_frame_size, &rd);
 
         if (rd == 0) {
             /* EOF. If there's audio we need to finish it. Goto: gasp! */
@@ -292,10 +294,10 @@ MediaRecorder::Encode(void *data)
                 goto audio_enc;
             else
                 return;
-        } else if (rd != (PRUint32)mr->vState->fsize) {
+        } else if (rd != (PRUint32)v_frame_size) {
             /* Now, we're in a pickle. HOW TO FIXME? */
             fprintf(stderr,
-                "only read %u of %d from video pipe\n", rd, mr->vState->fsize);
+                "only read %u of %d from video pipe\n", rd, v_frame_size);
             PR_Free(v_frame);
             return;
         }
@@ -361,32 +363,32 @@ audio_enc:
         if (mr->a_rec) {
              
         /* Make sure we get enough frames in unless we're at the end */
-        a_frame = (char *) PR_Calloc(1, a_frame_size);
+        a_frame = (char *) PR_Calloc(1, a_frame_total);
 
         do mr->aState->aPipeIn->Available(&rd);
-            while ((rd < (PRUint32)a_frame_size) && !mr->a_stp);
-        rv = mr->aState->aPipeIn->Read((char *)a_frame, a_frame_size, &rd);
+            while ((rd < (PRUint32)a_frame_total) && !mr->a_stp);
+        rv = mr->aState->aPipeIn->Read((char *)a_frame, a_frame_total, &rd);
 
         if (rd == 0) {
             /* EOF. We're done. */
             PR_Free(a_frame);
             return;
-        } else if (rd != (PRUint32)a_frame_size) {
+        } else if (rd != (PRUint32)a_frame_total) {
             /* Hmm. I sure hope this is the end of the recording. */
             PR_Free(a_frame);
             if (!mr->a_stp)
                 fprintf(stderr,
-                    "only read %u of %d from audio pipe\n", rd, a_frame_size);
+                    "only read %u of %d from audio pipe\n", rd, a_frame_total);
             return;
         }
           
         /* Uninterleave samples. Alternatively, have portaudio do this? */
-        a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_size);
+        a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_total);
         for (i = 0; i < a_frame_len; i++){
             for (j = 0; j < NUM_CHANNELS; j++) {
                 a_buffer[j][i] =
-                    (float)((a_frame[i*mr->aState->fsize+((j*2)+1)]<<8) |
-                        ((0x00ff&(int)a_frame[i*mr->aState->fsize+(j*2)]))) /
+                    (float)((a_frame[i*a_frame_size+((j*2)+1)]<<8) |
+                        ((0x00ff&(int)a_frame[i*a_frame_size+(j*2)]))) /
                             32768.f;
             }
         }
@@ -642,8 +644,11 @@ MediaRecorder::Start(
         return NS_ERROR_FAILURE;
     }
 
-    vState->backend = new VideoSourceMac();
-    aState->backend = new AudioSourceAll();
+    /* Setup backend */
+    vState->backend =
+        new VideoSourceMac(FPS_N, FPS_D, WIDTH, HEIGHT);
+    aState->backend =
+        new AudioSourcePortaudio(NUM_CHANNELS, SAMPLE_RATE, SAMPLE_QUALITY);
 
     /* FIXME: device detection TBD */
     if (audio && (aState == nsnull)) {
@@ -655,17 +660,11 @@ MediaRecorder::Start(
         return NS_ERROR_FAILURE;
     }
 
-    /* Setup frame sizes */
-    vState->fsize = WIDTH * HEIGHT * 4;
-    aState->fsize = sizeof(SAMPLE) * NUM_CHANNELS;
-
     rv = CreateFile(input, file);
     if (NS_FAILED(rv)) return rv;
 
     /* Get ready for video! */
     if (video) {
-        vState->backend->SetOptions(FPS_N, FPS_D, WIDTH, HEIGHT);
-
         if (ctx) {
             vState->vCanvas = ctx;
         }
@@ -679,8 +678,6 @@ MediaRecorder::Start(
 
     /* Get ready for audio! */
     if (audio) {
-        aState->backend->SetOptions(NUM_CHANNELS, SAMPLE_RATE, SAMPLE_QUALITY);
-
         SetupVorbisBOS();
         rv = MakePipe(
             getter_AddRefs(aState->aPipeIn),

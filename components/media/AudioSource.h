@@ -4,51 +4,34 @@
  * else in the future.
  * TODO: Figure out if and how to do device selection
  */
-
 #include <prlog.h>
 #include <nsError.h>
-#include <portaudio.h>
 #include <nsIOutputStream.h>
 
+/* Defaults */
+#define NUM_CHANNELS    1
 #define FRAMES_BUFFER   1024
+
 #define SAMPLE          PRInt16
+#define SAMPLE_RATE     22050
 #define SAMPLE_FORMAT   paInt16
+#define SAMPLE_QUALITY  (float)(0.4)
 
 class AudioSource {
 public:
-    virtual nsresult Stop();
-    virtual int GetFrameSize();
-    virtual nsresult Start(nsIOutputStream *pipe);
-    virtual void SetOptions(int channels, int rate, float quality);
-};
-
-/*
- * Portaudio implementation.
- */
-class AudioSourceAll : public AudioSource {
-public:
-    AudioSourceAll();
-    ~AudioSourceAll();
-
-    nsresult Stop();
+    /* Reuse constructor and frame size getter */
+    AudioSource(int channels, int rate, float quality);
     int GetFrameSize();
-    nsresult Start(nsIOutputStream *pipe);
-    void SetOptions(int channels, int rate, float quality);
+
+    /* Implement these two. Write 2byte, n-channel audio to pipe */
+    virtual nsresult Stop() = 0;
+    virtual nsresult Start(nsIOutputStream *pipe) = 0;
 
 protected:
     int rate;
     int channels;
     float quality;
     PRLogModuleInfo *log;
-    nsIOutputStream *output;
-
-    PaStream *stream;
-    PaDeviceIndex source;
-
-    static int Callback(
-        const void *input, void *output, unsigned long frames,
-        const PaStreamCallbackTimeInfo* time,
-        PaStreamCallbackFlags flags, void *data
-    );
 
 };
+

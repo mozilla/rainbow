@@ -5,31 +5,24 @@
  */
 
 #include "VideoSource.h"
-#include <prlog.h>
+
 #include <prmem.h>
 #include <vidcap/vidcap.h>
 #include <vidcap/converters.h>
 
 class VideoSourceMac : public VideoSource {
 public:
-    VideoSourceMac();
+    VideoSourceMac(int n, int d, int w, int h);
     ~VideoSourceMac();
 
     nsresult Stop();
     nsresult Start(nsIOutputStream *pipe);
-    void SetOptions(int fps_n, int fps_d, int width, int height);
 
 protected:
-    int fps_n;
-    int fps_d;
-    int width;
-    int height;
-    PRLogModuleInfo *log;
-    nsIOutputStream *output;
-
     vidcap_sapi *sapi;
     vidcap_src *source;
     vidcap_state *state;
+    nsIOutputStream *output;
     struct vidcap_src_info *sources;
 
     static int Callback(

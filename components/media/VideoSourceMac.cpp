@@ -1,12 +1,10 @@
 #include "VideoSourceMac.h"
 
-VideoSourceMac::VideoSourceMac()
+VideoSourceMac::VideoSourceMac(int n, int d, int w, int h)
+    : VideoSource(n, d, w, h)
 {
-    /* Logger */
-    log = PR_NewLogModule("VideoSourceMac");
-
     /* Setup video devices */
-    int n = 0;
+    int nd = 0;
     struct vidcap_sapi_info sapi_info;
     if (!(state = vidcap_initialize())) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not initialize vidcap\n"));
@@ -21,20 +19,20 @@ VideoSourceMac::VideoSourceMac()
         return;
     }
 
-    n = vidcap_src_list_update(sapi);
-    if (n < 0) {
+    nd = vidcap_src_list_update(sapi);
+    if (nd < 0) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_list_update\n"));
         return;
-    } else if (n == 0) {
+    } else if (nd == 0) {
         /* No video capture device available */
         PR_LOG(log, PR_LOG_DEBUG, ("No video devices were found!\n"));
         return;
     } else {
         if (!(sources = (struct vidcap_src_info *)
-            PR_Calloc(n, sizeof(struct vidcap_src_info)))) {
+            PR_Calloc(nd, sizeof(struct vidcap_src_info)))) {
             return;
         }
-        if (vidcap_src_list_get(sapi, n, sources)) {
+        if (vidcap_src_list_get(sapi, nd, sources)) {
             PR_Free(sources);
             PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_list_get\n"));
             return;
@@ -47,15 +45,6 @@ VideoSourceMac::~VideoSourceMac()
     vidcap_sapi_release(sapi);
     vidcap_destroy(state);
     PR_Free(sources);
-}
-
-void
-VideoSourceMac::SetOptions(int n, int d, int w, int h)
-{
-    fps_n = n;
-    fps_d = d;
-    width = w;
-    height = h;
 }
 
 nsresult
@@ -113,14 +102,13 @@ VideoSourceMac::Callback(
     /*
      * See note above to see when this ugliness will go away.
      */
-
     VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
 
     nsresult rv;
     PRUint32 wr;
     char *rgbptr;
     char *i420ptr;
-    int rgbfsize = vsm->width * vsm->height * 4;
+    int rgbfsize = vsm->GetFrameSize();
     int i420fsize = vsm->width * vsm->height * 3 / 2;
     int frames = video->video_data_size  / i420fsize;
     char *rgb = (char *)PR_Calloc(rgbfsize, frames);

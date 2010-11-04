@@ -52,7 +52,9 @@ cpp_objects = $(cpp_sources:.cpp=.o)
 
 # source and path configurations
 idl = IMediaRecorder.idl
-cpp_sources = MediaRecorder.cpp MediaModule.cpp AudioSource.cpp VideoSourceMac.cpp
+cpp_sources = MediaRecorder.cpp MediaModule.cpp \
+    VideoSource.cpp VideoSourceMac.cpp \
+    AudioSource.cpp AudioSourcePortaudio.cpp
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
