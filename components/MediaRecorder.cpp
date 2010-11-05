@@ -55,63 +55,6 @@ MediaRecorder::GetSingleton()
     return gMediaRecordingService;
 }
 
-/* Let's get all the static methods out of the way */
-#define TABLE_SIZE 36
-static const char table[] = {
-    'a','b','c','d','e','f','g','h','i','j',
-    'k','l','m','n','o','p','q','r','s','t',
-    'u','v','w','x','y','z','0','1','2','3',
-    '4','5','6','7','8','9' 
-};
-/*
- * This code is ripped from profile/src/nsProfile.cpp and is further
- * duplicated in uriloader/exthandler.  this should probably be moved
- * into xpcom or some other shared library.
- */ 
-static void
-MakeRandomString(char *buf, PRInt32 bufLen)
-{
-    /* turn PR_Now() into milliseconds since epoch
-     * and salt rand with that.
-     */
-    double fpTime;
-    LL_L2D(fpTime, PR_Now());
-
-    /* use 1e-6, granularity of PR_Now() on the mac is seconds */
-    srand((uint)(fpTime * 1e-6 + 0.5));   
-    PRInt32 i;
-    for (i=0;i<bufLen;i++) {
-        *buf++ = table[rand()%TABLE_SIZE];
-    }
-    *buf = 0;
-}
-
-/*
- * This replaces \ with \\ so that Windows paths are sane
- */
-static void
-EscapeBackslash(nsACString& str)
-{
-    const char *sp;
-    const char *mp = "\\";
-    const char *np = "\\\\";
-
-    PRUint32 sl;
-    PRUint32 ml = 1;
-    PRUint32 nl = 2;
-
-    sl = NS_CStringGetData(str, &sp);
-    for (const char* iter = sp; iter <= sp + sl - ml; ++iter) {
-        if (memcmp(iter, mp, ml) == 0) {
-            PRUint32 offset = iter - sp;
-            NS_CStringSetDataRange(str, offset, ml, np, nl);
-            sl = NS_CStringGetData(str, &sp);
-            iter = sp + offset + nl - 1;
-        }
-    }
-}
-
-
 /*
  * Make a pipe (since NS_NewPipe2 isn't exposed by XPCOM)
  */
@@ -208,6 +151,8 @@ void
 MediaRecorder::WriteAudio(void *data)
 {
     int ret;
+    nsresult rv;
+    PRUint32 wr;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
 
     while (vorbis_analysis_blockout(&mr->aState->vd, &mr->aState->vb) == 1) {
@@ -221,10 +166,16 @@ MediaRecorder::WriteAudio(void *data)
                 ret = ogg_stream_pageout(&mr->aState->os, &mr->aState->og);
                 if (ret == 0)
                     break;
-                fwrite(mr->aState->og.header, mr->aState->og.header_len,
-                    1, mr->outfile);
-                fwrite(mr->aState->og.body, mr->aState->og.body_len,
-                    1, mr->outfile);
+                
+                rv = mr->pipeOut->Write(
+                    (const char*)mr->aState->og.header,
+                    mr->aState->og.header_len, &wr
+                );           
+                rv = mr->pipeOut->Write(
+                    (const char*)mr->aState->og.body,
+                    mr->aState->og.body_len, &wr
+                );
+
                 if (ogg_page_eos(&mr->aState->og))
                     break;
             }
@@ -240,6 +191,7 @@ MediaRecorder::Encode(void *data)
 {
     int i, j;
     nsresult rv;
+    PRUint32 wr;
     PRUint32 rd = 0;
 
     char *a_frame;
@@ -296,8 +248,8 @@ MediaRecorder::Encode(void *data)
                 return;
         } else if (rd != (PRUint32)v_frame_size) {
             /* Now, we're in a pickle. HOW TO FIXME? */
-            fprintf(stderr,
-                "only read %u of %d from video pipe\n", rd, v_frame_size);
+            PR_LOG(log, PR_LOG_NOTICE,
+                ("only read %u of %d from video pipe\n", rd, v_frame_size));
             PR_Free(v_frame);
             return;
         }
@@ -325,11 +277,11 @@ MediaRecorder::Encode(void *data)
 
         /* Encode 'er up */
         if (th_encode_ycbcr_in(mr->vState->th, v_buffer) != 0) {
-            fprintf(stderr, "Could not encode frame!\n");
+            PR_LOG(log, PR_LOG_NOTICE, ("Could not encode frame\n"));
             return;
         }
         if (!th_encode_packetout(mr->vState->th, 0, &mr->vState->op)) {
-            fprintf(stderr, "Could not read packet!\n");
+            PR_LOG(log, PR_LOG_NOTICE, ("Could not read packet\n"));
             return;
         }
         
@@ -349,10 +301,14 @@ MediaRecorder::Encode(void *data)
 
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
         while (ogg_stream_pageout(&mr->vState->os, &mr->vState->og)) {
-            fwrite(mr->vState->og.header, mr->vState->og.header_len,
-                1, mr->outfile);
-            fwrite(mr->vState->og.body, mr->vState->og.body_len,
-                1, mr->outfile);
+            rv = mr->pipeOut->Write(
+                (const char*)mr->vState->og.header,
+                mr->vState->og.header_len, &wr
+            );
+            rv = mr->pipeOut->Write(
+                (const char*)mr->vState->og.body,
+                mr->vState->og.body_len, &wr
+            );
         }
         PR_Free(v_frame);
 
@@ -377,8 +333,8 @@ audio_enc:
             /* Hmm. I sure hope this is the end of the recording. */
             PR_Free(a_frame);
             if (!mr->a_stp)
-                fprintf(stderr,
-                    "only read %u of %d from audio pipe\n", rd, a_frame_total);
+                PR_LOG(log, PR_LOG_NOTICE,
+                    ("only read %u of %d from audio pipe\n", rd, a_frame_total));
             return;
         }
           
@@ -399,9 +355,7 @@ audio_enc:
         PR_Free(a_frame);
 
         }
-
         /* We keep looping until we reach EOF on either pipe */
-        fflush(mr->outfile);
     }
 }
 
@@ -414,6 +368,9 @@ MediaRecorder::Init()
 {
     a_rec = PR_FALSE;
     v_rec = PR_FALSE;
+
+    log = PR_NewLogModule("MediaRecorder");
+
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
     return NS_OK;   
@@ -432,8 +389,11 @@ MediaRecorder::~MediaRecorder()
 nsresult
 MediaRecorder::SetupTheoraBOS()
 {
+    nsresult rv;
+    PRUint32 wr;
+
     if (ogg_stream_init(&vState->os, rand())) {
-        fprintf(stderr, "Failed ogg_stream_init!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed ogg_stream_init\n"));
         return NS_ERROR_FAILURE;
     }
     
@@ -464,18 +424,23 @@ MediaRecorder::SetupTheoraBOS()
     th_comment_add_tag(&vState->tc, (char *)"ENCODER", (char *)"rainbow");
     if (th_encode_flushheader(
         vState->th, &vState->tc, &vState->op) <= 0) {
-        fprintf(stderr,"Internal Theora library error.\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Internal Theora library error\n"));
         return NS_ERROR_FAILURE;
     }
     th_comment_clear(&vState->tc);
     
     ogg_stream_packetin(&vState->os, &vState->op);
     if (ogg_stream_pageout(&vState->os, &vState->og) != 1) {
-        fprintf(stderr,"Internal Ogg library error.\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Internal Ogg library error\n"));
         return NS_ERROR_FAILURE;
     }
-    fwrite(vState->og.header, 1, vState->og.header_len, outfile);
-    fwrite(vState->og.body, 1, vState->og.body_len, outfile);
+    
+    rv = pipeOut->Write(
+        (const char*)vState->og.header, vState->og.header_len, &wr
+    );
+    rv = pipeOut->Write(
+        (const char*)vState->og.body, vState->og.body_len, &wr
+    );
 
     return NS_OK;
 }
@@ -487,6 +452,8 @@ nsresult
 MediaRecorder::SetupTheoraHeaders()
 {
     int ret;
+    nsresult rv;
+    PRUint32 wr;
 
     /* Create rest of the theora headers */
     for (;;) {
@@ -494,7 +461,7 @@ MediaRecorder::SetupTheoraHeaders()
             vState->th, &vState->tc, &vState->op
         );
         if (ret < 0){
-            fprintf(stderr,"Internal Theora library error.\n");
+            PR_LOG(log, PR_LOG_NOTICE, ("Internal Theora library error\n"));
             return NS_ERROR_FAILURE;
         } else if (!ret) break;
         ogg_stream_packetin(&vState->os, &vState->op);
@@ -503,12 +470,16 @@ MediaRecorder::SetupTheoraHeaders()
     for (;;) {
         ret = ogg_stream_flush(&vState->os, &vState->og);
         if (ret < 0){
-            fprintf(stderr,"Internal Ogg library error.\n");
+            PR_LOG(log, PR_LOG_NOTICE, ("Internal Ogg library error\n"));
             return NS_ERROR_FAILURE;
         }
         if (ret == 0) break;
-        fwrite(vState->og.header, 1, vState->og.header_len, outfile);
-        fwrite(vState->og.body, 1, vState->og.body_len, outfile);
+        rv = pipeOut->Write(
+            (const char*)vState->og.header, vState->og.header_len, &wr
+        );
+        rv = pipeOut->Write(
+            (const char*)vState->og.body, vState->og.body_len, &wr
+        );
     }
 
     return NS_OK;
@@ -521,8 +492,11 @@ nsresult
 MediaRecorder::SetupVorbisBOS()
 {
     int ret;
+    nsresult rv;
+    PRUint32 wr;
+
     if (ogg_stream_init(&aState->os, rand())) {
-        fprintf(stderr, "Failed ogg_stream_init!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed ogg_stream_init\n"));
         return NS_ERROR_FAILURE;
     }
 
@@ -531,7 +505,7 @@ MediaRecorder::SetupVorbisBOS()
         &aState->vi, NUM_CHANNELS, SAMPLE_RATE, SAMPLE_QUALITY
     );
     if (ret) {
-        fprintf(stderr, "Failed vorbis_encode_init!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed vorbis_encode_init\n"));
         return NS_ERROR_FAILURE;
     }
     
@@ -554,11 +528,16 @@ MediaRecorder::SetupVorbisBOS()
         ogg_stream_packetin(&aState->os, &header_code);
 
         if (ogg_stream_pageout(&aState->os, &aState->og) != 1) {
-            fprintf(stderr,"Internal Ogg library error.\n");
+            PR_LOG(log, PR_LOG_NOTICE, ("Internal Ogg library error\n"));
             return NS_ERROR_FAILURE;
         }
-        fwrite(aState->og.header, 1, aState->og.header_len, outfile);
-        fwrite(aState->og.body, 1, aState->og.body_len, outfile);
+        
+        rv = pipeOut->Write(
+            (const char*)aState->og.header, aState->og.header_len, &wr
+        );
+        rv = pipeOut->Write(
+            (const char*)aState->og.body, aState->og.body_len, &wr
+        );
     }
 
     return NS_OK;
@@ -571,96 +550,79 @@ nsresult
 MediaRecorder::SetupVorbisHeaders()
 {
     int ret;
+    nsresult rv;
+    PRUint32 wr;
+
     while ((ret = ogg_stream_flush(&aState->os, &aState->og)) != 0) {
-        fwrite(aState->og.header, 1, aState->og.header_len, outfile);
-        fwrite(aState->og.body, 1, aState->og.body_len, outfile);
+        rv = pipeOut->Write(
+            (const char*)aState->og.header, aState->og.header_len, &wr
+        );
+        rv = pipeOut->Write(
+            (const char*)aState->og.body, aState->og.body_len, &wr
+        );
     }
 
     return NS_OK;
 }
 
 /*
- * Create a temporary file to dump to
- */
-nsresult
-MediaRecorder::CreateFile(nsIDOMHTMLInputElement *input, nsACString &file)
-{
-    nsresult rv;
-    char buf[13];
-    const char *name;
-    nsCAutoString path;
-    nsCOMPtr<nsIFile> o;
-
-    /* Assign temporary name */
-    rv = NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(o));
-    if (NS_FAILED(rv)) return rv;
-    
-    MakeRandomString(buf, 8);
-    memcpy(buf + 8, ".ogg", 5);
-    rv = o->AppendNative(nsDependentCString(buf, 12));
-    if (NS_FAILED(rv)) return rv;
-    rv = o->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 0600);
-    if (NS_FAILED(rv)) return rv;
-    rv = o->GetNativePath(path);
-    if (NS_FAILED(rv)) return rv;
-    rv = o->Remove(PR_FALSE);
-    if (NS_FAILED(rv)) return rv;
-
-    /* Open file */
-    name = path.get();
-    if (!(outfile = fopen(name, "w+"))) {
-        fprintf(stderr, "Could not open OGG file\n");
-        return NS_ERROR_FAILURE;
-    }
-    EscapeBackslash(path);
-
-
-    /* We get a DOMFile in this convoluted manner because nsDOMFile is not
-     * public. See bug #607114
-     */
-    NS_ConvertUTF8toUTF16 unipath(name);
-    const PRUnichar *arr = unipath.get();
-    rv = input->MozSetFileNameArray(&arr, 1);
-    if (NS_FAILED(rv)) return rv;
-
-    file.Assign(name, strlen(name));
-    return rv;
-}
-
-/*
- * Start recording to file
+ * Start recording to pipe
  */
 NS_IMETHODIMP
 MediaRecorder::Start(
-    PRBool audio, PRBool video,
-    nsIDOMHTMLInputElement *input,
+    nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsACString &file
+    nsIAsyncInputStream **pipeIn
 )
 {
     nsresult rv;
+    double qual;
+    PRBool audio, video;
+    PRUint32 fps_n, fps_d, width, height, rate, n_chan;
+
     if (a_rec || v_rec) {
-        fprintf(stderr, "Recording in progress!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Recording in progress\n"));
         return NS_ERROR_FAILURE;
     }
+
+    /* Get properties else set to defaults */
+    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("audio"), &audio);
+    if (NS_FAILED(rv)) audio = PR_TRUE; 
+    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("video"), &video);
+    if (NS_FAILED(rv)) video = PR_TRUE;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_n"), &fps_n);
+    if (NS_FAILED(rv)) fps_n = FPS_N;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_d"), &fps_d);
+    if (NS_FAILED(rv)) fps_d = FPS_D;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("width"), &width);
+    if (NS_FAILED(rv)) width = WIDTH;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("height"), &height);
+    if (NS_FAILED(rv)) height = HEIGHT;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("channels"), &n_chan);
+    if (NS_FAILED(rv)) n_chan = NUM_CHANNELS;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("sample_rate"), &rate);
+    if (NS_FAILED(rv)) rate = SAMPLE_RATE;
+    rv = prop->GetPropertyAsDouble(NS_LITERAL_STRING("sample_quality"), &qual);
+    if (NS_FAILED(rv)) qual = (double)SAMPLE_QUALITY;
 
     /* Setup backend */
     vState->backend =
-        new VideoSourceMac(FPS_N, FPS_D, WIDTH, HEIGHT);
+        new VideoSourceMac(fps_n, fps_d, width, height);
     aState->backend =
-        new AudioSourcePortaudio(NUM_CHANNELS, SAMPLE_RATE, SAMPLE_QUALITY);
+        new AudioSourcePortaudio(n_chan, rate, (float)qual);
 
     /* FIXME: device detection TBD */
     if (audio && (aState == nsnull)) {
-        fprintf(stderr, "Audio requested but no devices found!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Audio requested but no devices found\n"));
         return NS_ERROR_FAILURE;
     }
     if (video && (vState == nsnull)) {
-        fprintf(stderr, "Video requested but no devices found!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("Video requested but no devices found\n"));
         return NS_ERROR_FAILURE;
     }
 
-    rv = CreateFile(input, file);
+    /* Setup pipe for interface */
+    rv = MakePipe(pipeIn, getter_AddRefs(pipeOut));
     if (NS_FAILED(rv)) return rv;
 
     /* Get ready for video! */
@@ -722,9 +684,10 @@ NS_IMETHODIMP
 MediaRecorder::Stop()
 {
     nsresult rv;
+    PRUint32 wr;
 
     if (!a_rec && !v_rec) {
-        fprintf(stderr, "No recording in progress!\n");
+        PR_LOG(log, PR_LOG_NOTICE, ("No recording in progress\n"));
         return NS_ERROR_FAILURE;    
     }
 
@@ -756,8 +719,12 @@ MediaRecorder::Stop()
 
         /* Video trailer */
         if (ogg_stream_flush(&vState->os, &vState->og)) {
-            fwrite(vState->og.header, vState->og.header_len, 1, outfile);
-            fwrite(vState->og.body, vState->og.body_len, 1, outfile);
+            rv = pipeOut->Write(
+                (const char*)vState->og.header, vState->og.header_len, &wr
+            );
+            rv = pipeOut->Write(
+                (const char*)vState->og.body, vState->og.body_len, &wr
+            );
         }
 
         ogg_stream_clear(&vState->os);
@@ -780,7 +747,7 @@ MediaRecorder::Stop()
     }
  
     /* GG */
-    fclose(outfile);
+    pipeOut->Close();
     return NS_OK;
 }
 

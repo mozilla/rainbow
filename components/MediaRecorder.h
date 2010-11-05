@@ -52,12 +52,10 @@
 #include <prthread.h>
 
 #include <nsIPipe.h>
+#include <nsCOMPtr.h>
 #include <nsStringAPI.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
-#include <nsIDOMHTMLInputElement.h>
-#include <nsDirectoryServiceDefs.h>
-#include <nsDirectoryServiceUtils.h>
 #include <nsComponentManagerUtils.h>
 #include <nsIDOMCanvasRenderingContext2D.h>
 
@@ -109,19 +107,20 @@ public:
     MediaRecorder(){}
 
 protected:
-    FILE *outfile;
     Audio *aState;
     Video *vState;
 
     PRThread *encoder;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
+    PRLogModuleInfo *log;
 
     nsresult SetupTheoraBOS();
     nsresult SetupVorbisBOS();
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
-    nsresult CreateFile(nsIDOMHTMLInputElement *input, nsACString &file);
+
+    nsCOMPtr<nsIAsyncOutputStream> pipeOut;
 
     static void Encode(void *data);
     static void WriteAudio(void *data);
