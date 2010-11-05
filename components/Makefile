@@ -6,18 +6,21 @@ ifeq ($(sys), Darwin)
   compiler = gcc
   cxx = g++
   so = dylib
+  teh = Mac
 else
 ifeq ($(sys), MINGW32_NT-6.1)
   os = WINNT
   compiler = msvc
   cxx = cl
   so = dll
+  teh = Win
 else
 ifeq ($(sys), Linux)
   os = Linux
   compiler = gcc
   cxx = g++
   so = so
+  teh = Nix
 else
   $(error Sorry, your os is unknown/unsupported: $(sys))
 endif
@@ -48,12 +51,11 @@ endif
 # Target and objects
 target = libmediarecorder
 so_target = $(target:=.$(so))
-cpp_objects = $(cpp_sources:.cpp=.o)
 
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp \
-    VideoSource.cpp VideoSourceMac.cpp \
+    VideoSource.cpp VideoSource$(teh).cpp \
     AudioSource.cpp AudioSourcePortaudio.cpp
 
 sdkdir ?= ${MOZSDKDIR}
@@ -73,6 +75,7 @@ idl_typelib = $(idl:.idl=.xpt)
 cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
+cppflags = -DRAINBOW_$(teh)
 headers = -I. -I$(sdkdir)/include \
     -I$(sdkdir)/include/system_wrappers \
     -I$(sdkdir)/include/xpcom \
@@ -96,7 +99,7 @@ ifeq ($(os), Darwin)
     cppflags += -g -DDEBUG
   endif
 
-  cppflags += -c -pipe -Os -arch i386 -dynamiclib -DRAINBOW_MAC \
+  cppflags += -c -pipe -Os -arch i386 -dynamiclib \
     -DMOZ_NO_MOZALLOC -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -fshort-wchar -fpascal-strings -pthread \
     -Wall -Werror -Wconversion -Wpointer-arith \
@@ -128,7 +131,7 @@ ifeq ($(os), WINNT)
 
   ifeq ($(debug),1)
     cppflags += -MTd -DDEBUG
-    ldops = msvcrtd.lib \
+    ldops = -DEBUG msvcrtd.lib \
         /NODEFAULTLIB:libcmt /NODEFAULTLIB:msvcrt /NODEFAULTLIB:libcmtd
   else
     cppflags += -MT
@@ -143,7 +146,7 @@ ifeq ($(os), WINNT)
     -DWIN32=1 -DXP_WIN=1 -DXP_WIN32=1 -DHW_THREADS=1 -DSTDC_HEADERS=1 \
     -DWIN32_LEAN_AND_MEAN=1 -DNO_X11=1 -DHAVE_MMINTRIN_H=1 \
     -DHAVE_OLEACC_IDL=1 -DHAVE_ATLBASE_H=1 -DHAVE_WPCAPI_H=1 -D_X86_=1 \
-    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1 -DRAINBOW_WIN=1
+    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1
   ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS -NXCOMPAT -SAFESEH \
     -IMPLIB:fake.lib \
     $(libdirs) $(libs) \
@@ -151,8 +154,7 @@ ifeq ($(os), WINNT)
     ../lib/WINNT_x86-msvc/libvorbis.lib \
     ../lib/WINNT_x86-msvc/libtheora.lib \
     ../lib/WINNT_x86-msvc/portaudio.lib \
-    ../lib/WINNT_x86-msvc/libvidcap.lib \
-    strmiids.lib comsuppw.lib $(ldops) 
+    strmiids.lib comsuppw.lib ole32.lib user32.lib $(ldops) 
 rcflags := -r $(headers)
 else
 ifeq ($(os), Linux)
@@ -164,7 +166,7 @@ ifeq ($(os), Linux)
     cppflags += -g -DDEBUG
   endif
 
-  cppflags += -pipe -Os -shared -DRAINBOW_NIX \
+  cppflags += -pipe -Os -shared \
     -DMOZ_NO_MOZALLOC -DMOZILLA_STRICT_API -fshort-wchar \
     -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -pthread -Wall -Werror -Wconversion \
@@ -198,7 +200,7 @@ build: $(so_target) $(idl_typelib)
 clean: 
 	rm -f $(so_target) $(cpp_objects) \
   $(idl_typelib) $(idl_headers) \
-	$(target:=.res) fake.lib fake.exp
+	$(target:=.res) fake.lib fake.exp $(target).pdb $(target).ilk
 
 # rules to build the c headers and .xpt from idl
 $(idl_headers): $(idl)

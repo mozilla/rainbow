@@ -39,10 +39,6 @@
 
 #include "IMediaRecorder.h"
 
-#ifdef _MSC_VER
-#include <windows.h>
-#endif
-
 #include <ogg/ogg.h>
 #include <vorbis/vorbisenc.h>
 #include <theora/theoraenc.h>
@@ -60,8 +56,11 @@
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 /* ifdefs are evil, but I am powerless */
-#ifdef RAINBOW_MAC
+#ifdef RAINBOW_Mac
 #include "VideoSourceMac.h"
+#endif
+#ifdef RAINBOW_Win
+#include "VideoSourceWin.h"
 #endif
 
 /* We use portaudio for all platforms currently */

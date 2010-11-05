@@ -312,9 +312,10 @@ audio_enc:
         } else if (rd != (PRUint32)a_frame_total) {
             /* Hmm. I sure hope this is the end of the recording. */
             PR_Free(a_frame);
-            if (!mr->a_stp)
+            if (!mr->a_stp) {
                 PR_LOG(mr->log, PR_LOG_NOTICE,
                     ("only read %u of %d from audio pipe\n", rd, a_frame_total));
+            }
             return;
         }
           
@@ -486,7 +487,7 @@ MediaRecorder::SetupVorbisBOS()
 
     vorbis_info_init(&aState->vi);
     ret = vorbis_encode_init_vbr(
-        &aState->vi, params->chan, params->rate, params->qual
+        &aState->vi, params->chan, params->rate, (float)params->qual
     );
     if (ret) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vorbis_encode_init\n"));
@@ -666,12 +667,17 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
     }
 
     /* Setup video backend */
-    #ifdef RAINBOW_MAC
+    #ifdef RAINBOW_Mac
     vState->backend = new VideoSourceMac(
         params->fps_n, params->fps_d, params->width, params->height
     );
     #endif
-    
+    #ifdef RAINBOW_Win
+    vState->backend = new VideoSourceWin(
+        params->fps_n, params->fps_d, params->width, params->height
+    );
+    #endif
+
     /* Audio backend same for all platforms */
     aState->backend = new AudioSourcePortaudio(
         params->chan, params->rate, (float)params->qual
