@@ -665,10 +665,14 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
         return NS_ERROR_FAILURE;
     }
 
-    /* Setup backend */
+    /* Setup video backend */
+    #ifdef RAINBOW_MAC
     vState->backend = new VideoSourceMac(
         params->fps_n, params->fps_d, params->width, params->height
     );
+    #endif
+    
+    /* Audio backend same for all platforms */
     aState->backend = new AudioSourcePortaudio(
         params->chan, params->rate, (float)params->qual
     );

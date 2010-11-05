@@ -60,7 +60,11 @@
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 /* ifdefs are evil, but I am powerless */
+#ifdef RAINBOW_MAC
 #include "VideoSourceMac.h"
+#endif
+
+/* We use portaudio for all platforms currently */
 #include "AudioSourcePortaudio.h"
 
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"

@@ -96,8 +96,8 @@ ifeq ($(os), Darwin)
     cppflags += -g -DDEBUG
   endif
 
-  cppflags += -c -pipe -Os -arch i386 -dynamiclib -DMOZ_NO_MOZALLOC \
-    -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
+  cppflags += -c -pipe -Os -arch i386 -dynamiclib -DRAINBOW_MAC \
+    -DMOZ_NO_MOZALLOC -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -fshort-wchar -fpascal-strings -pthread \
     -Wall -Werror -Wconversion -Wpointer-arith \
     -Woverloaded-virtual -Wsynth -Wno-ctor-dtor-privacy \
@@ -143,7 +143,7 @@ ifeq ($(os), WINNT)
     -DWIN32=1 -DXP_WIN=1 -DXP_WIN32=1 -DHW_THREADS=1 -DSTDC_HEADERS=1 \
     -DWIN32_LEAN_AND_MEAN=1 -DNO_X11=1 -DHAVE_MMINTRIN_H=1 \
     -DHAVE_OLEACC_IDL=1 -DHAVE_ATLBASE_H=1 -DHAVE_WPCAPI_H=1 -D_X86_=1 \
-    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1 
+    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1 -DRAINBOW_WIN=1
   ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS -NXCOMPAT -SAFESEH \
     -IMPLIB:fake.lib \
     $(libdirs) $(libs) \
@@ -164,7 +164,8 @@ ifeq ($(os), Linux)
     cppflags += -g -DDEBUG
   endif
 
-  cppflags += -pipe -Os -shared -fshort-wchar \
+  cppflags += -pipe -Os -shared -DRAINBOW_NIX \
+    -DMOZ_NO_MOZALLOC -DMOZILLA_STRICT_API -fshort-wchar \
     -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -pthread -Wall -Werror -Wconversion \
     -Wpointer-arith -Woverloaded-virtual -Wsynth \
@@ -172,7 +173,6 @@ ifeq ($(os), Linux)
     -Wno-long-long -include xpcom-config.h $(headers)
  
   ldflags += -pthread -pipe -m32 \
-    -DMOZ_NO_MOZALLOC -DMOZILLA_STRICT_API \
     -Wl,-z,defs \
     -Wl,-rpath-link,$(sdkdir)/bin \
     $(sdkdir)/lib/libxpcomglue_s.a \
