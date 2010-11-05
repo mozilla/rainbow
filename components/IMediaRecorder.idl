@@ -34,6 +34,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "nsILocalFile.idl"
 #include "nsIPropertyBag2.idl"
 #include "nsIAsyncInputStream.idl"
 #include "nsIDOMCanvasRenderingContext2D.idl"
@@ -41,7 +42,10 @@
 [scriptable, uuid(c467b1f4-551c-4e2f-a6ba-cb7d792d1452)]
 interface IMediaRecorder : nsISupports
 {
-    nsIAsyncInputStream start(in nsIPropertyBag2 prop,
+    void recordToFile(in nsIPropertyBag2 prop,
+        in nsIDOMCanvasRenderingContext2D ctx,
+        in nsILocalFile file);
+    nsIAsyncInputStream recordToPipe(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx);
     void stop();
 };

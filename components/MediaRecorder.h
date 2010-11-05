@@ -43,7 +43,6 @@
 #include <windows.h>
 #endif
 
-#include <stdio.h>
 #include <ogg/ogg.h>
 #include <vorbis/vorbisenc.h>
 #include <theora/theoraenc.h>
@@ -54,6 +53,7 @@
 #include <nsIPipe.h>
 #include <nsCOMPtr.h>
 #include <nsStringAPI.h>
+#include <nsIFileStreams.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
 #include <nsComponentManagerUtils.h>
@@ -95,6 +95,12 @@ typedef struct {
     nsIDOMCanvasRenderingContext2D *vCanvas;
 } Video;
 
+typedef struct {
+    double qual;
+    PRBool audio, video;
+    PRUint32 fps_n, fps_d, width, height, rate, chan;
+} Properties;
+
 class MediaRecorder : public IMediaRecorder
 {
 public:
@@ -120,11 +126,18 @@ protected:
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
 
-    nsCOMPtr<nsIAsyncOutputStream> pipeOut;
+    nsCOMPtr<nsIOutputStream> pipeOut;
 
     static void Encode(void *data);
     static void WriteAudio(void *data);
     static MediaRecorder *gMediaRecordingService;
+
+    void ParseProperties(nsIPropertyBag2 *prop);
+    nsresult Record(nsIDOMCanvasRenderingContext2D *ctx);
+    nsresult MakePipe(nsIAsyncInputStream **in, nsIAsyncOutputStream **out);
+
+private:
+    Properties *params;
 
 };
 

@@ -55,31 +55,6 @@ MediaRecorder::GetSingleton()
     return gMediaRecordingService;
 }
 
-/*
- * Make a pipe (since NS_NewPipe2 isn't exposed by XPCOM)
- */
-static nsresult
-MakePipe(nsIAsyncInputStream **pipeIn,
-            nsIAsyncOutputStream **pipeOut)
-{
-    nsCOMPtr<nsIPipe> pipe = do_CreateInstance("@mozilla.org/pipe;1");
-    if (!pipe)
-        return NS_ERROR_OUT_OF_MEMORY;
-
-    /* Video frame size > audio frame so we optimize for that */
-    int size = WIDTH * HEIGHT * 3 / 2;
-    nsresult rv = pipe->Init(
-        PR_FALSE, PR_FALSE,
-        size, FRAMES_BUFFER, nsnull
-    );
-    if (NS_FAILED(rv))
-        return rv;
-
-    pipe->GetInputStream(pipeIn);
-    pipe->GetOutputStream(pipeOut);
-    return NS_OK;
-}
-
 /* 
  * Convert RGB32 to i420. NOTE: size of dest must be >= width * height * 3 / 2
  * Based on formulas found at http://en.wikipedia.org/wiki/YUV  (libvidcap)
@@ -223,7 +198,7 @@ MediaRecorder::Encode(void *data)
      * a second and encode 10 frames of video and 88200 bytes of audio per
      * run of the loop?
      */
-    int a_frame_len = SAMPLE_RATE/(FPS_N/FPS_D);
+    int a_frame_len = mr->params->rate/(mr->params->fps_n/mr->params->fps_d);
     int v_frame_size = mr->vState->backend->GetFrameSize();
     int a_frame_size = mr->aState->backend->GetFrameSize();
     int a_frame_total = a_frame_len * a_frame_size;
@@ -248,23 +223,26 @@ MediaRecorder::Encode(void *data)
                 return;
         } else if (rd != (PRUint32)v_frame_size) {
             /* Now, we're in a pickle. HOW TO FIXME? */
-            PR_LOG(log, PR_LOG_NOTICE,
+            PR_LOG(mr->log, PR_LOG_NOTICE,
                 ("only read %u of %d from video pipe\n", rd, v_frame_size));
             PR_Free(v_frame);
             return;
         }
 
         /* Convert RGB32 to i420 */
-        unsigned char *i420 = (unsigned char *)PR_Calloc(WIDTH * HEIGHT * 3 / 2, 1);
-        RGB32toI420(WIDTH, HEIGHT, (const char *)v_frame, (char *)i420);
+        unsigned char *i420 = (unsigned char *)
+            PR_Calloc(mr->params->width * mr->params->height * 3 / 2, 1);
+
+        RGB32toI420(mr->params->width, mr->params->height,
+            (const char *)v_frame, (char *)i420);
 
         /* Convert i420 to YCbCr */
-        v_buffer[0].width = WIDTH;
-        v_buffer[0].stride = WIDTH;
-        v_buffer[0].height = HEIGHT;
+        v_buffer[0].width = mr->params->width;
+        v_buffer[0].stride = mr->params->width;
+        v_buffer[0].height = mr->params->height;
 
-        v_buffer[1].width = (WIDTH >> 1);
-        v_buffer[1].height = (HEIGHT >> 1);
+        v_buffer[1].width = (v_buffer[0].width >> 1);
+        v_buffer[1].height = (v_buffer[0].height >> 1);
         v_buffer[1].stride = v_buffer[1].width;
 
         v_buffer[2].width = v_buffer[1].width;
@@ -272,16 +250,17 @@ MediaRecorder::Encode(void *data)
         v_buffer[2].stride = v_buffer[1].stride;
 
         v_buffer[0].data = i420;
-        v_buffer[1].data = i420 + WIDTH * HEIGHT;
-        v_buffer[2].data = v_buffer[1].data + WIDTH * HEIGHT / 4;
+        v_buffer[1].data = i420 + v_buffer[0].width * v_buffer[0].height;
+        v_buffer[2].data =
+            v_buffer[1].data + v_buffer[0].width * v_buffer[0].height / 4;
 
         /* Encode 'er up */
         if (th_encode_ycbcr_in(mr->vState->th, v_buffer) != 0) {
-            PR_LOG(log, PR_LOG_NOTICE, ("Could not encode frame\n"));
+            PR_LOG(mr->log, PR_LOG_NOTICE, ("Could not encode frame\n"));
             return;
         }
         if (!th_encode_packetout(mr->vState->th, 0, &mr->vState->op)) {
-            PR_LOG(log, PR_LOG_NOTICE, ("Could not read packet\n"));
+            PR_LOG(mr->log, PR_LOG_NOTICE, ("Could not read packet\n"));
             return;
         }
         
@@ -289,13 +268,14 @@ MediaRecorder::Encode(void *data)
         if (mr->vState->vCanvas) {
             /* Looks like libvidcap gives as BGRA but we want RGBA */
             unsigned char tmp = 0;
-            for (int j = 0; j < WIDTH * HEIGHT * 4; j += 4) {
+            for (int j = 0; j < v_frame_size; j += 4) {
                 tmp = v_frame[j+2];
                 v_frame[j+2] = v_frame[j];
                 v_frame[j] = tmp;
             }
             rv = mr->vState->vCanvas->PutImageData_explicit(
-                0, 0, WIDTH, HEIGHT, v_frame, WIDTH * HEIGHT * 4
+                0, 0, mr->params->width, mr->params->height,
+                v_frame, v_frame_size
             );
         }
 
@@ -333,7 +313,7 @@ audio_enc:
             /* Hmm. I sure hope this is the end of the recording. */
             PR_Free(a_frame);
             if (!mr->a_stp)
-                PR_LOG(log, PR_LOG_NOTICE,
+                PR_LOG(mr->log, PR_LOG_NOTICE,
                     ("only read %u of %d from audio pipe\n", rd, a_frame_total));
             return;
         }
@@ -341,7 +321,7 @@ audio_enc:
         /* Uninterleave samples. Alternatively, have portaudio do this? */
         a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_total);
         for (i = 0; i < a_frame_len; i++){
-            for (j = 0; j < NUM_CHANNELS; j++) {
+            for (j = 0; j < (int)mr->params->chan; j++) {
                 a_buffer[j][i] =
                     (float)((a_frame[i*a_frame_size+((j*2)+1)]<<8) |
                         ((0x00ff&(int)a_frame[i*a_frame_size+(j*2)]))) /
@@ -371,6 +351,7 @@ MediaRecorder::Init()
 
     log = PR_NewLogModule("MediaRecorder");
 
+    params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
     return NS_OK;   
@@ -378,6 +359,7 @@ MediaRecorder::Init()
 
 MediaRecorder::~MediaRecorder()
 {
+    PR_Free(params);
     PR_Free(vState);
     PR_Free(aState);
     gMediaRecordingService = nsnull;
@@ -399,23 +381,25 @@ MediaRecorder::SetupTheoraBOS()
     
     th_info_init(&vState->ti);
     /* Must be multiples of 16 */
-    vState->ti.frame_width = ((WIDTH + 15) >> 4) << 4;
-    vState->ti.frame_height = ((HEIGHT + 15) >> 4) << 4;
-    vState->ti.pic_width = WIDTH;
-    vState->ti.pic_height = HEIGHT;
+    vState->ti.frame_width = ((params->width + 15) >> 4) << 4;
+    vState->ti.frame_height = ((params->height + 15) >> 4) << 4;
+    vState->ti.pic_width = params->width;
+    vState->ti.pic_height = params->height;
     vState->ti.pic_x = 0;
     vState->ti.pic_y = 0;
     
     /* Too fast? Why? */
-    vState->ti.fps_numerator = FPS_N;
-    vState->ti.fps_denominator = FPS_D;
+    vState->ti.fps_numerator = params->fps_n;
+    vState->ti.fps_denominator = params->fps_d;
     vState->ti.aspect_numerator = 0;
     vState->ti.aspect_denominator = 0;
+    vState->ti.target_bitrate = 0;
+
+    /* Are these the right values? */ 
+    vState->ti.quality = (int)(params->qual * 100);
     vState->ti.colorspace = TH_CS_UNSPECIFIED;
     vState->ti.pixel_fmt = TH_PF_420;
-    vState->ti.target_bitrate = 0;
-    vState->ti.quality = 48;
-    
+
     vState->th = th_encode_alloc(&vState->ti);
     th_info_clear(&vState->ti);
     
@@ -502,7 +486,7 @@ MediaRecorder::SetupVorbisBOS()
 
     vorbis_info_init(&aState->vi);
     ret = vorbis_encode_init_vbr(
-        &aState->vi, NUM_CHANNELS, SAMPLE_RATE, SAMPLE_QUALITY
+        &aState->vi, params->chan, params->rate, params->qual
     );
     if (ret) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vorbis_encode_init\n"));
@@ -566,67 +550,141 @@ MediaRecorder::SetupVorbisHeaders()
 }
 
 /*
+ * Make a pipe (since NS_NewPipe2 isn't exposed by XPCOM)
+ */
+nsresult
+MediaRecorder::MakePipe(nsIAsyncInputStream **in,
+            nsIAsyncOutputStream **out)
+{
+    nsCOMPtr<nsIPipe> pipe = do_CreateInstance("@mozilla.org/pipe;1");
+    if (!pipe)
+        return NS_ERROR_OUT_OF_MEMORY;
+
+    /* Video frame size > audio frame so we optimize for that */
+    int size = params->width * params->height * 4;
+    nsresult rv = pipe->Init(
+        PR_FALSE, PR_FALSE,
+        size, FRAMES_BUFFER, nsnull
+    );
+    if (NS_FAILED(rv))
+        return rv;
+
+    pipe->GetInputStream(in);
+    pipe->GetOutputStream(out);
+    return NS_OK;
+}
+
+/*
+ * Start recording to file
+ */
+NS_IMETHODIMP
+MediaRecorder::RecordToFile(
+    nsIPropertyBag2 *prop,
+    nsIDOMCanvasRenderingContext2D *ctx,
+    nsILocalFile *file
+)
+{
+    nsresult rv;
+    ParseProperties(prop);
+
+    /* Get a file stream from the local file */
+    nsCOMPtr<nsIFileOutputStream> stream(
+        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
+    );
+    
+    pipeOut = do_QueryInterface(stream, &rv);
+    if (NS_FAILED(rv)) return rv;
+    rv = stream->Init(file, -1, -1, 0);
+    if (NS_FAILED(rv)) return rv;
+
+    return Record(ctx);
+}
+
+/*
  * Start recording to pipe
  */
 NS_IMETHODIMP
-MediaRecorder::Start(
+MediaRecorder::RecordToPipe(
     nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
     nsIAsyncInputStream **pipeIn
 )
 {
     nsresult rv;
-    double qual;
-    PRBool audio, video;
-    PRUint32 fps_n, fps_d, width, height, rate, n_chan;
+    ParseProperties(prop);
+    
+    /* Setup IO pipe */
+    nsCOMPtr<nsIAsyncOutputStream> asyncPipe;
+    rv = MakePipe(pipeIn, getter_AddRefs(asyncPipe));
+    if (NS_FAILED(rv)) return rv;
+    
+    pipeOut = do_QueryInterface(asyncPipe, &rv);
+    if (NS_FAILED(rv)) return rv;
+
+    return Record(ctx);
+}
+
+/*
+ * Parse and set properties
+ */
+void
+MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
+{
+    nsresult rv;
+
+    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("audio"), &params->audio);
+    if (NS_FAILED(rv)) params->audio = PR_TRUE; 
+    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("video"), &params->video);
+    if (NS_FAILED(rv)) params->video = PR_TRUE;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_n"), &params->fps_n);
+    if (NS_FAILED(rv)) params->fps_n = FPS_N;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_d"), &params->fps_d);
+    if (NS_FAILED(rv)) params->fps_d = FPS_D;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("width"), &params->width);
+    if (NS_FAILED(rv)) params->width = WIDTH;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("height"), &params->height);
+    if (NS_FAILED(rv)) params->height = HEIGHT;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("channels"), &params->chan);
+    if (NS_FAILED(rv)) params->chan = NUM_CHANNELS;
+    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("rate"), &params->rate);
+    if (NS_FAILED(rv)) params->rate = SAMPLE_RATE;
+    rv = prop->GetPropertyAsDouble(NS_LITERAL_STRING("quality"), &params->qual);
+    if (NS_FAILED(rv)) params->qual = (double)SAMPLE_QUALITY;
+}
+
+/*
+ * Actual record method
+ */
+nsresult
+MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
+{
+    nsresult rv; 
 
     if (a_rec || v_rec) {
         PR_LOG(log, PR_LOG_NOTICE, ("Recording in progress\n"));
         return NS_ERROR_FAILURE;
     }
 
-    /* Get properties else set to defaults */
-    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("audio"), &audio);
-    if (NS_FAILED(rv)) audio = PR_TRUE; 
-    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("video"), &video);
-    if (NS_FAILED(rv)) video = PR_TRUE;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_n"), &fps_n);
-    if (NS_FAILED(rv)) fps_n = FPS_N;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_d"), &fps_d);
-    if (NS_FAILED(rv)) fps_d = FPS_D;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("width"), &width);
-    if (NS_FAILED(rv)) width = WIDTH;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("height"), &height);
-    if (NS_FAILED(rv)) height = HEIGHT;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("channels"), &n_chan);
-    if (NS_FAILED(rv)) n_chan = NUM_CHANNELS;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("sample_rate"), &rate);
-    if (NS_FAILED(rv)) rate = SAMPLE_RATE;
-    rv = prop->GetPropertyAsDouble(NS_LITERAL_STRING("sample_quality"), &qual);
-    if (NS_FAILED(rv)) qual = (double)SAMPLE_QUALITY;
-
     /* Setup backend */
-    vState->backend =
-        new VideoSourceMac(fps_n, fps_d, width, height);
-    aState->backend =
-        new AudioSourcePortaudio(n_chan, rate, (float)qual);
+    vState->backend = new VideoSourceMac(
+        params->fps_n, params->fps_d, params->width, params->height
+    );
+    aState->backend = new AudioSourcePortaudio(
+        params->chan, params->rate, (float)params->qual
+    );
 
     /* FIXME: device detection TBD */
-    if (audio && (aState == nsnull)) {
+    if (params->audio && (aState == nsnull)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Audio requested but no devices found\n"));
         return NS_ERROR_FAILURE;
     }
-    if (video && (vState == nsnull)) {
+    if (params->video && (vState == nsnull)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Video requested but no devices found\n"));
         return NS_ERROR_FAILURE;
     }
 
-    /* Setup pipe for interface */
-    rv = MakePipe(pipeIn, getter_AddRefs(pipeOut));
-    if (NS_FAILED(rv)) return rv;
-
     /* Get ready for video! */
-    if (video) {
+    if (params->video) {
         if (ctx) {
             vState->vCanvas = ctx;
         }
@@ -639,7 +697,7 @@ MediaRecorder::Start(
     }
 
     /* Get ready for audio! */
-    if (audio) {
+    if (params->audio) {
         SetupVorbisBOS();
         rv = MakePipe(
             getter_AddRefs(aState->aPipeIn),
@@ -649,21 +707,20 @@ MediaRecorder::Start(
     }
 
     /* Let's DO this. */
-    if (video) {
+    if (params->video) {
         SetupTheoraHeaders();
         rv = vState->backend->Start(vState->vPipeOut);
         if (NS_FAILED(rv)) return rv;
         v_rec = PR_TRUE;
         v_stp = PR_FALSE;
     }
-    if (audio) {
+    if (params->audio) {
         SetupVorbisHeaders();
         rv = aState->backend->Start(aState->aPipeOut);
         if (NS_FAILED(rv)) return rv;
         a_rec = PR_TRUE;
         a_stp = PR_FALSE;
     }
-
 
     /* Encode thread */
     encoder = PR_CreateThread(
