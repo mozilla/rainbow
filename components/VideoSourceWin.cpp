@@ -62,10 +62,14 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
     hr = pDevEnum->CreateClassEnumerator(
         CLSID_VideoInputDeviceCategory, &pClassEnum, 0
     );
-    if (FAILED(hr)) return hr;
+    if (FAILED(hr)) {
+        SAFE_RELEASE(pDevEnum);
+        return hr;
+    }
     
     if (pClassEnum == NULL) {
         // No devices available
+        SAFE_RELEASE(pDevEnum);
         return E_FAIL;
     }
 
@@ -73,11 +77,20 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
     // Note that if the Next() call succeeds but there are no monikers,
     // it will return S_FALSE (which is not a failure).
     hr = pClassEnum->Next (1, &pMoniker, NULL);
-    if (hr == S_FALSE) return E_FAIL;
+    if (hr == S_FALSE) {
+        SAFE_RELEASE(pDevEnum);
+        SAFE_RELEASE(pClassEnum);
+        return E_FAIL;
+    }
     
     hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void**)&pSrc);
-    if (FAILED(hr)) return hr;
-    
+    if (FAILED(hr)) {
+        SAFE_RELEASE(pDevEnum);
+        SAFE_RELEASE(pClassEnum);
+        SAFE_RELEASE(pMoniker);
+        return hr;
+    }
+
     *ppSrcFilter = pSrc;
     (*ppSrcFilter)->AddRef();
 
@@ -93,7 +106,10 @@ VideoSourceWin::VideoSourceWin(int n, int d, int w, int h)
     : VideoSource(n, d, w, h)
 {
     HRESULT hr;
-    CoInitialize(0);
+    g2g = PR_FALSE;
+
+    hr = CoInitialize(0);
+    if (FAILED(hr)) return;
 
     hr = CoCreateInstance(
         CLSID_FilterGraph, NULL, CLSCTX_INPROC,
@@ -146,29 +162,36 @@ VideoSourceWin::VideoSourceWin(int n, int d, int w, int h)
         pSrcFilter->Release();
         return;
     }
+
+    // Instance initialized properly
+    g2g = PR_TRUE;
 }
 
 VideoSourceWin::~VideoSourceWin()
 {
-    CoUninitialize();
     SAFE_RELEASE(pMC);
     SAFE_RELEASE(pNullF);
     SAFE_RELEASE(pGraph);
     SAFE_RELEASE(pCapture);
     SAFE_RELEASE(pGrabber);
+    SAFE_RELEASE(pGrabberF);
+
+    CoUninitialize();
 }
 
 nsresult
 VideoSourceWin::Start(nsIOutputStream *pipe)
 {
     HRESULT hr;
-    AM_MEDIA_TYPE mt;
     AM_MEDIA_TYPE *pCapmt;
     VIDEOINFOHEADER *pVid;
     IAMStreamConfig *pConfig;
     
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+
     hr = pCapture->FindInterface(
-        &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,pSrcFilter,
+        &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, pSrcFilter,
         IID_IAMStreamConfig, (void**)&pConfig
     );
     if (FAILED(hr)) {
@@ -177,34 +200,37 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
     }
     
     hr = pConfig->GetFormat(&pCapmt);
+
+    pCapmt->majortype = MEDIATYPE_Video;
+    pCapmt->subtype = MEDIASUBTYPE_ARGB32;
+    pCapmt->formattype = FORMAT_VideoInfo;
+
     pVid = reinterpret_cast<VIDEOINFOHEADER*>(pCapmt->pbFormat);
     pVid->bmiHeader.biWidth = width;
     pVid->bmiHeader.biHeight = height;
-    pVid->AvgTimePerFrame = 10000000 * (fps_d / fps_n);
+    pVid->AvgTimePerFrame = NANOSECONDS * (fps_n / fps_d);
+
     pConfig->SetFormat(pCapmt);
-    
-    ZeroMemory(&mt, sizeof(AM_MEDIA_TYPE));
-    mt.majortype = MEDIATYPE_Video;
-    mt.subtype = MEDIASUBTYPE_ARGB32;
-    mt.formattype = FORMAT_VideoInfo;
-    hr = pGrabber->SetMediaType(&mt);
-    hr = pGrabber->SetBufferSamples(TRUE);
+    pGrabber->SetMediaType(pCapmt);
+    pGrabber->SetBufferSamples(TRUE);
     
     // Set our callback
     cb = new VideoSourceWinCallback(pipe);
-    hr = pGrabber->SetCallback(cb, 1);
+    hr = pGrabber->SetCallback(cb, TYPE_BUFFERCB);
     
     // Add Sample Grabber to graph
     hr = pGraph->AddFilter(pGrabberF, L"Sample Grabber");
     if (FAILED(hr)) {
-        pSrcFilter->Release();
+        SAFE_RELEASE(pConfig);
+        SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
 
     // Add Null Renderer to graph
     hr = pGraph->AddFilter(pNullF, L"Null Filter");
     if (FAILED(hr)) {
-        pSrcFilter->Release();
+        SAFE_RELEASE(pConfig);
+        SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
 
@@ -214,11 +240,14 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
         pSrcFilter, pGrabberF, pNullF
     );
     if (FAILED(hr)) {
-        pSrcFilter->Release();
+        SAFE_RELEASE(pConfig);
+        SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
-    pSrcFilter->Release();
-    
+
+    SAFE_RELEASE(pConfig);
+    SAFE_RELEASE(pSrcFilter);
+
     hr = pMC->Run();
     if (FAILED(hr)) return NS_ERROR_FAILURE;
 
@@ -228,6 +257,9 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
 nsresult
 VideoSourceWin::Stop()
 {
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+
     pMC->StopWhenReady();
     delete cb;
     return NS_OK;

@@ -45,6 +45,9 @@
 #include <windows.h>
 #include <dshow.h>
 
+#define TYPE_BUFFERCB   1
+#define NANOSECONDS     10000000
+
 /* Begin qedit.h */
 interface ISampleGrabberCB : public IUnknown
 {
@@ -104,6 +107,7 @@ public:
     nsresult Start(nsIOutputStream *pipe);
 
 protected:
+    PRBool g2g;
     IMediaControl *pMC;
     IGraphBuilder *pGraph;
     ICaptureGraphBuilder2 *pCapture;
