@@ -37,18 +37,12 @@
  * ***** END LICENSE BLOCK ***** */
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+Components.utils.import("resource://rainbow/content/rainbow.js");
 
 const PREFNAME = "allowedDomains";
 const DEFAULT_DOMAINS = ["http://localhost"];
 
 let RainbowInjector = {
-    get _media() {
-        delete this._media;
-        return this._media =
-            Components.classes["@labs.mozilla.com/media/recorder;1"].
-                getService(Components.interfaces.IMediaRecorder);
-    },
-
     SCRIPT_TO_INJECT_URI: "resource://rainbow/content/injected.js",
     get _toInject() {
         delete this._toInject;
@@ -74,14 +68,14 @@ let RainbowInjector = {
 
         return this._toInject = toInject;
     },
-    
+
     inject: function(win) {
         let sandbox = new Components.utils.Sandbox(
             Components.classes["@mozilla.org/systemprincipal;1"].
                createInstance(Components.interfaces.nsIPrincipal)
         );
-        sandbox.importFunction(this._media.start, "recStart");
-        sandbox.importFunction(this._media.stop, "recStop");
+        sandbox.importFunction(Rainbow.recordToFile, "recStart");
+        sandbox.importFunction(Rainbow.stop, "recStop");
         sandbox.window = win.wrappedJSObject;
         
         Components.utils.evalInSandbox(

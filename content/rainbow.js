@@ -38,11 +38,11 @@ let EXPORTED_SYMBOLS = ["Rainbow"];
 
 const Cc = Components.classes;
 const Ci = Components.interfaces;
-const Cu = Components.utils;
 
-function Rainbow() {
-}
-Rainbow.prototype = {
+let Rainbow = {
+    _input: null,
+    _recording: false,
+
     _makePropertyBag: function(prop) {
         let bP = ["audio", "video"];
         let iP = ["fps_n", "fps_d", "width", "height", "channels", "rate"];
@@ -68,27 +68,36 @@ Rainbow.prototype = {
     },
 
     recordToFile: function(prop, ctx) {
+        if (Rainbow._recording)
+            throw "Recording already in progress";
+
         // Make property bag
-        let bag = this._makePropertyBag(prop);
+        let bag = Rainbow._makePropertyBag(prop);
 
         // Create a file to dump to
         let file = Cc["@mozilla.org/file/directory_service;1"].  
             getService(Ci.nsIProperties).get("TmpD", Ci.nsILocalFile);
         file.append("rainbow.ogg");
         file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, 0666);
-        
+
+        // Create dummy HTML <input> element to create DOMFile
+        let doc = ctx.canvas.ownerDocument;
+        Rainbow._input = doc.createElement('input');
+        Rainbow._input.type = 'file';
+        Rainbow._input.mozSetFileNameArray([file.path], 1);
+
         // Start recording
         Cc["@labs.mozilla.com/media/recorder;1"].
             getService(Ci.IMediaRecorder).recordToFile(bag, ctx, file);
         
-        return file.path;
+        Rainbow._recording = true;
     },
 
     stop: function() {
         Cc["@labs.mozilla.com/media/recorder;1"].
             getService(Ci.IMediaRecorder).stop();
-
-        // TODO: return nsIDOMFile
+        Rainbow._recording = false;
+        return Rainbow._input;
     }
 };
 

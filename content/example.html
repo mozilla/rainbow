@@ -33,16 +33,17 @@
             Re = false;
             but.value = "Start!";
             ctx.drawImage(img, 192, 112);
-            msg.innerHTML = "Your video was recorded to: " + Fi;
-            // The path is useless. Access the actual file with:
-            // fil.files[0].name, fil.files[0].size, fil.files[0].type etc.
+
             // See https://developer.mozilla.org/en/Using_files_from_web_applications
+            msg.innerHTML = "Your video was named: " +
+                Fi.files.item(0).fileName + " and is " +
+                Fi.files.item(0).fileSize + " bytes big!";
         } else {
             // Start recording
             Re = true;
             but.value = "Stop!";
             msg.innerHTML = " ";
-            Sr = Me.record(true, true, fil, ctx);
+            Sr = Me.record({}, ctx);
         }
     }
 </script>

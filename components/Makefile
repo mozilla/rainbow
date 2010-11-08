@@ -100,13 +100,15 @@ ifeq ($(os), Darwin)
   endif
 
   cppflags += -c -pipe -Os -arch i386 -dynamiclib \
-    -DMOZ_NO_MOZALLOC -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
+    -mmacosx-version-min=10.5 -DMOZ_NO_MOZALLOC -fPIC \
+    -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -fshort-wchar -fpascal-strings -pthread \
     -Wall -Werror -Wconversion -Wpointer-arith \
     -Woverloaded-virtual -Wsynth -Wno-ctor-dtor-privacy \
     -Wno-non-virtual-dtor -Wcast-align -Wno-long-long \
     -include xpcom-config.h $(headers)
-  ldflags += -pthread -pipe -bundle -arch i386 \
+  ldflags += -pthread -pipe -bundle \
+    -mmacosx-version-min=10.5 -arch i386 \
     -Wl,-executable_path,$(sdkdir)/bin \
     -Wl,-dead_strip \
     ../lib/Darwin_i386-gcc3/libogg.a \

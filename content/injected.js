@@ -2,15 +2,14 @@
  * Wrap IMediaRecorder in HTML5 device like API. Not quite there, but close.
  * http://www.whatwg.org/specs/web-apps/current-work/complete/commands.html#devices
  */
-function StreamRecorder(audio, video, doc, ctx)
+function StreamRecorder(params, ctx)
 {
-    this._file = recStart(audio, video, doc, ctx);
+    recStart(params, ctx);
     return this;    
 }
 StreamRecorder.prototype.stop = function()
 {
-    recStop();
-    return this._file;
+    return recStop();
 }
 
 /*
