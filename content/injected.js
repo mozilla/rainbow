@@ -4,10 +4,19 @@
  */
 function StreamRecorder(params, ctx)
 {
-    recStart(params, ctx);
+    recFStart(params, ctx);
     return this;    
 }
 StreamRecorder.prototype.stop = function()
+{
+    return recStop();
+}
+function SocketRecorder(params, ctx, sock)
+{
+    recSStart(params, ctx, sock);
+    return this;
+}
+SocketRecorder.prototype.stop = function()
 {
     return recStop();
 }
@@ -20,8 +29,11 @@ if (window && window.navigator) {
         window.navigator.service = {};
 
     window.navigator.service.media = {
-        record: function(audio, video, doc, ctx) {
-            return new StreamRecorder(audio, video, doc, ctx);
+        recordToFile: function(params, ctx) {
+            return new StreamRecorder(params, ctx);
+        },
+        recordToSocket: function(params, ctx, sock) {
+            return new SocketRecorder(params, ctx, sock);
         }
     }
 }

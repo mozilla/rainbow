@@ -74,9 +74,11 @@ let RainbowInjector = {
             Components.classes["@mozilla.org/systemprincipal;1"].
                createInstance(Components.interfaces.nsIPrincipal)
         );
-        sandbox.importFunction(Rainbow.recordToFile, "recStart");
-        sandbox.importFunction(Rainbow.stop, "recStop");
         sandbox.window = win.wrappedJSObject;
+
+        sandbox.importFunction(Rainbow.stop, "recStop");
+        sandbox.importFunction(Rainbow.recordToFile, "recFStart");
+        sandbox.importFunction(Rainbow.recordToSocket, "recSStart");
         
         Components.utils.evalInSandbox(
             this._toInject, sandbox, "1.8", this.SCRIPT_TO_INJECT_URI, 1

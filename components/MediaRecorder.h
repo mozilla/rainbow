@@ -44,6 +44,7 @@
 #include <theora/theoraenc.h>
 
 #include <prmem.h>
+#include <plbase64.h>
 #include <prthread.h>
 
 #include <nsIPipe.h>
@@ -66,6 +67,7 @@
 /* We use portaudio for all platforms currently */
 #include "AudioSourcePortaudio.h"
 
+#define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
 #define MEDIA_RECORDER_CID { 0xc467b1f4, 0x551c, 0x4e2f, \
                            { 0xa6, 0xba, 0xcb, 0x7d, 0x79, 0x2d, 0x14, 0x52 }}
@@ -129,11 +131,19 @@ protected:
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
 
-    nsCOMPtr<nsIOutputStream> pipeOut;
+    nsCOMPtr<nsIWebSocket> pipeSock;
+    nsCOMPtr<nsIOutputStream> pipeFile;
+
+    nsCOMPtr<nsIAsyncInputStream> sockIn;
+    nsCOMPtr<nsIAsyncOutputStream> sockOut;
+
+    static MediaRecorder *gMediaRecordingService;
 
     static void Encode(void *data);
     static void WriteAudio(void *data);
-    static MediaRecorder *gMediaRecordingService;
+    static nsresult WriteData(
+        void *obj, unsigned char *data, PRUint32 len, PRUint32 *wr
+    );
 
     void ParseProperties(nsIPropertyBag2 *prop);
     nsresult Record(nsIDOMCanvasRenderingContext2D *ctx);

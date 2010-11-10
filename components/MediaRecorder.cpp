@@ -142,13 +142,11 @@ MediaRecorder::WriteAudio(void *data)
                 if (ret == 0)
                     break;
                 
-                rv = mr->pipeOut->Write(
-                    (const char*)mr->aState->og.header,
-                    mr->aState->og.header_len, &wr
+                rv = mr->WriteData(
+                    mr, mr->aState->og.header, mr->aState->og.header_len, &wr
                 );           
-                rv = mr->pipeOut->Write(
-                    (const char*)mr->aState->og.body,
-                    mr->aState->og.body_len, &wr
+                rv = mr->WriteData(
+                    mr, mr->aState->og.body, mr->aState->og.body_len, &wr
                 );
 
                 if (ogg_page_eos(&mr->aState->og))
@@ -157,6 +155,45 @@ MediaRecorder::WriteAudio(void *data)
         }
     }
 }
+
+nsresult
+MediaRecorder::WriteData(
+    void *obj, unsigned char *data, PRUint32 len, PRUint32 *wr)
+{
+    nsresult rv;
+    PRUint32 av;
+    char *decoded;
+    char *encoded;
+    PRBool success;
+    MediaRecorder *mr = static_cast<MediaRecorder*>(obj);
+
+    if (mr->pipeFile) {
+        return mr->pipeFile->Write((const char*)data, len, wr);
+    }
+
+    if (mr->pipeSock) {
+        /* We're batching websocket writes every SOCK_LEN bytes */
+        mr->sockOut->Write((const char*)data, len, wr);
+
+        if (NS_SUCCEEDED(mr->sockIn->Available(&av)) && av >= SOCK_LEN) {
+            decoded = (char *)PR_Calloc(SOCK_LEN, 1);
+            rv = mr->sockIn->Read(decoded, SOCK_LEN, &av);
+
+            /* Base64 is ((srclen + 2)/3)*4 in size. We do this because
+             * websockets cannot send binary data (yet) */
+            encoded = PL_Base64Encode((const char*)decoded, SOCK_LEN, nsnull);
+            rv = mr->pipeSock->Send(NS_ConvertUTF8toUTF16(encoded), &success);
+
+            PR_Free(decoded);
+            PR_Free(encoded);
+            return rv;     
+        }
+        return NS_OK;
+    }
+
+    return NS_ERROR_FAILURE;
+}
+
 
 /*
  * Encoder, runs in a thread
@@ -281,13 +318,11 @@ MediaRecorder::Encode(void *data)
 
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
         while (ogg_stream_pageout(&mr->vState->os, &mr->vState->og)) {
-            rv = mr->pipeOut->Write(
-                (const char*)mr->vState->og.header,
-                mr->vState->og.header_len, &wr
+            rv = mr->WriteData(
+                mr, mr->vState->og.header, mr->vState->og.header_len, &wr
             );
-            rv = mr->pipeOut->Write(
-                (const char*)mr->vState->og.body,
-                mr->vState->og.body_len, &wr
+            rv = mr->WriteData(
+                mr, mr->vState->og.body, mr->vState->og.body_len, &wr
             );
         }
         PR_Free(v_frame);
@@ -352,6 +387,9 @@ MediaRecorder::Init()
 
     log = PR_NewLogModule("MediaRecorder");
 
+    pipeSock = nsnull;
+    pipeFile = nsnull;
+
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
@@ -363,6 +401,7 @@ MediaRecorder::~MediaRecorder()
     PR_Free(params);
     PR_Free(vState);
     PR_Free(aState);
+
     gMediaRecordingService = nsnull;
 }
 
@@ -420,11 +459,11 @@ MediaRecorder::SetupTheoraBOS()
         return NS_ERROR_FAILURE;
     }
     
-    rv = pipeOut->Write(
-        (const char*)vState->og.header, vState->og.header_len, &wr
+    rv = WriteData(
+        this, vState->og.header, vState->og.header_len, &wr
     );
-    rv = pipeOut->Write(
-        (const char*)vState->og.body, vState->og.body_len, &wr
+    rv = WriteData(
+        this, vState->og.body, vState->og.body_len, &wr
     );
 
     return NS_OK;
@@ -459,11 +498,11 @@ MediaRecorder::SetupTheoraHeaders()
             return NS_ERROR_FAILURE;
         }
         if (ret == 0) break;
-        rv = pipeOut->Write(
-            (const char*)vState->og.header, vState->og.header_len, &wr
+        rv = WriteData(
+            this, vState->og.header, vState->og.header_len, &wr
         );
-        rv = pipeOut->Write(
-            (const char*)vState->og.body, vState->og.body_len, &wr
+        rv = WriteData(
+            this, vState->og.body, vState->og.body_len, &wr
         );
     }
 
@@ -517,11 +556,11 @@ MediaRecorder::SetupVorbisBOS()
             return NS_ERROR_FAILURE;
         }
         
-        rv = pipeOut->Write(
-            (const char*)aState->og.header, aState->og.header_len, &wr
+        rv = WriteData(
+            this, aState->og.header, aState->og.header_len, &wr
         );
-        rv = pipeOut->Write(
-            (const char*)aState->og.body, aState->og.body_len, &wr
+        rv = WriteData(
+            this, aState->og.body, aState->og.body_len, &wr
         );
     }
 
@@ -539,11 +578,11 @@ MediaRecorder::SetupVorbisHeaders()
     PRUint32 wr;
 
     while ((ret = ogg_stream_flush(&aState->os, &aState->og)) != 0) {
-        rv = pipeOut->Write(
-            (const char*)aState->og.header, aState->og.header_len, &wr
+        rv = WriteData(
+            this, aState->og.header, aState->og.header_len, &wr
         );
-        rv = pipeOut->Write(
-            (const char*)aState->og.body, aState->og.body_len, &wr
+        rv = WriteData(
+            this, aState->og.body, aState->og.body_len, &wr
         );
     }
 
@@ -593,7 +632,7 @@ MediaRecorder::RecordToFile(
         do_CreateInstance("@mozilla.org/network/file-output-stream;1")
     );
     
-    pipeOut = do_QueryInterface(stream, &rv);
+    pipeFile = do_QueryInterface(stream, &rv);
     if (NS_FAILED(rv)) return rv;
     rv = stream->Init(file, -1, -1, 0);
     if (NS_FAILED(rv)) return rv;
@@ -602,25 +641,18 @@ MediaRecorder::RecordToFile(
 }
 
 /*
- * Start recording to pipe
+ * Start recording to web socket
  */
 NS_IMETHODIMP
-MediaRecorder::RecordToPipe(
+MediaRecorder::RecordToSocket(
     nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsIAsyncInputStream **pipeIn
+    nsIWebSocket *sock
 )
 {
-    nsresult rv;
+    pipeSock = sock;    
     ParseProperties(prop);
-    
-    /* Setup IO pipe */
-    nsCOMPtr<nsIAsyncOutputStream> asyncPipe;
-    rv = MakePipe(pipeIn, getter_AddRefs(asyncPipe));
-    if (NS_FAILED(rv)) return rv;
-    
-    pipeOut = do_QueryInterface(asyncPipe, &rv);
-    if (NS_FAILED(rv)) return rv;
+    MakePipe(getter_AddRefs(sockIn), getter_AddRefs(sockOut));
 
     return Record(ctx);
 }
@@ -660,7 +692,6 @@ nsresult
 MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
 {
     nsresult rv; 
-
     if (a_rec || v_rec) {
         PR_LOG(log, PR_LOG_NOTICE, ("Recording in progress\n"));
         return NS_ERROR_FAILURE;
@@ -786,11 +817,11 @@ MediaRecorder::Stop()
 
         /* Video trailer */
         if (ogg_stream_flush(&vState->os, &vState->og)) {
-            rv = pipeOut->Write(
-                (const char*)vState->og.header, vState->og.header_len, &wr
+            rv = WriteData(
+                this, vState->og.header, vState->og.header_len, &wr
             );
-            rv = pipeOut->Write(
-                (const char*)vState->og.body, vState->og.body_len, &wr
+            rv = WriteData(
+                this, vState->og.body, vState->og.body_len, &wr
             );
         }
 
@@ -814,7 +845,14 @@ MediaRecorder::Stop()
     }
  
     /* GG */
-    pipeOut->Close();
+    if (pipeFile) {
+        pipeFile->Close();
+        pipeFile = nsnull;
+    }
+    if (pipeSock) {
+        pipeSock = nsnull;
+    }
+
     return NS_OK;
 }
 

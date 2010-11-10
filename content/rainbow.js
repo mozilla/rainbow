@@ -93,11 +93,30 @@ let Rainbow = {
         Rainbow._recording = true;
     },
 
+    recordToSocket: function(prop, ctx, sock) {
+        if (Rainbow._recording)
+            throw "Recording already in progress";
+
+        let bag = Rainbow._makePropertyBag(prop);
+        Cc["@labs.mozilla.com/media/recorder;1"].
+            getService(Ci.IMediaRecorder).recordToSocket(bag, ctx, sock);
+        
+        Rainbow._recording = true;
+    },
+
     stop: function() {
+        if (!Rainbow._recording)
+            throw "No recording in progress";
+
         Cc["@labs.mozilla.com/media/recorder;1"].
             getService(Ci.IMediaRecorder).stop();
         Rainbow._recording = false;
-        return Rainbow._input;
+
+        if (Rainbow._input) {
+            let ret = Rainbow._input;
+            Rainbow._input = null;
+            return ret;
+        }
     }
 };
 
