@@ -19,6 +19,7 @@
  *
  * Contributor(s):
  *   Anant Narayanan <anant@kix.in>
+ *   Brian Coleman <brianfcoleman@gmail.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -47,9 +48,13 @@
 #include <plbase64.h>
 #include <prthread.h>
 
-#include <nsIPipe.h>
 #include <nsCOMPtr.h>
+#include <nsAutoPtr.h>
 #include <nsStringAPI.h>
+#include <nsThreadUtils.h>
+
+#include <nsIPipe.h>
+#include <nsIRunnable.h>
 #include <nsIFileStreams.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
@@ -151,6 +156,27 @@ protected:
 
 private:
     Properties *params;
+
+};
+
+class CanvasRenderer : public nsIRunnable
+{
+public:
+    CanvasRenderer(
+        nsIDOMCanvasRenderingContext2D *pCtx,
+        PRUint32 width, PRUint32 height,
+        nsAutoArrayPtr<PRUint8> &pData,
+        PRUint32 pDataSize);
+    ~CanvasRenderer();
+    NS_DECL_ISUPPORTS
+    NS_DECL_NSIRUNNABLE
+
+private:
+    PRUint32 m_width;
+    PRUint32 m_height;
+    PRUint32 m_pDataSize;
+    nsAutoArrayPtr<PRUint8> m_pData;
+    nsIDOMCanvasRenderingContext2D *m_pCtx;
 
 };
 

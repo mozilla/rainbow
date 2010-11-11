@@ -19,6 +19,7 @@
  *
  * Contributor(s):
  *   Anant Narayanan <anant@kix.in>
+ *   Brian Coleman <brianfcoleman@gmail.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -208,7 +209,6 @@ MediaRecorder::Encode(void *data)
 
     char *a_frame;
     float **a_buffer;
-    unsigned char *v_frame;
     th_ycbcr_buffer v_buffer;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
 
@@ -245,15 +245,13 @@ MediaRecorder::Encode(void *data)
         if (mr->v_rec) {
 
         /* Make sure we get 1 full frame of video */
-        v_frame = (unsigned char *) PR_Calloc(1, v_frame_size);
-
+        nsAutoArrayPtr<PRUint8> v_frame(new PRUint8[v_frame_size]);
         do mr->vState->vPipeIn->Available(&rd);
             while ((rd < (PRUint32)v_frame_size) && !mr->v_stp);
-        rv = mr->vState->vPipeIn->Read((char *)v_frame, v_frame_size, &rd);
+        rv = mr->vState->vPipeIn->Read((char *)v_frame.get(), v_frame_size, &rd);
 
         if (rd == 0) {
             /* EOF. If there's audio we need to finish it. Goto: gasp! */
-            PR_Free(v_frame);
             if (mr->a_rec)
                 goto audio_enc;
             else
@@ -267,11 +265,11 @@ MediaRecorder::Encode(void *data)
         }
 
         /* Convert RGB32 to i420 */
-        unsigned char *i420 = (unsigned char *)
-            PR_Calloc(mr->params->width * mr->params->height * 3 / 2, 1);
+        nsAutoArrayPtr<PRUint8> i420(
+            new PRUint8[mr->params->width * mr->params->height * 3 / 2]);
 
         RGB32toI420(mr->params->width, mr->params->height,
-            (const char *)v_frame, (char *)i420);
+            (const char *)v_frame.get(), (char *)i420.get());
 
         /* Convert i420 to YCbCr */
         v_buffer[0].width = mr->params->width;
@@ -286,8 +284,8 @@ MediaRecorder::Encode(void *data)
         v_buffer[2].height = v_buffer[1].height;
         v_buffer[2].stride = v_buffer[1].stride;
 
-        v_buffer[0].data = i420;
-        v_buffer[1].data = i420 + v_buffer[0].width * v_buffer[0].height;
+        v_buffer[0].data = i420.get();
+        v_buffer[1].data = i420.get() + v_buffer[0].width * v_buffer[0].height;
         v_buffer[2].data =
             v_buffer[1].data + v_buffer[0].width * v_buffer[0].height / 4;
 
@@ -301,19 +299,25 @@ MediaRecorder::Encode(void *data)
             return;
         }
         
-        /* Write to canvas, if needed. Move to another thread? */
+        /* Write to canvas, if needed */
         if (mr->vState->vCanvas) {
-            /* Looks like libvidcap gives as BGRA but we want RGBA */
-            unsigned char tmp = 0;
+            /* OSes give us BGRA but we want RGBA */
+            PRUint8 tmp = 0;
+            PRUint8 *pData = v_frame.get();
             for (int j = 0; j < v_frame_size; j += 4) {
-                tmp = v_frame[j+2];
-                v_frame[j+2] = v_frame[j];
-                v_frame[j] = tmp;
+                tmp = pData[j+2];
+                pData[j+2] = pData[j];
+                pData[j] = tmp;
             }
-            rv = mr->vState->vCanvas->PutImageData_explicit(
-                0, 0, mr->params->width, mr->params->height,
-                v_frame, v_frame_size
+            
+            nsRefPtr<CanvasRenderer> pCanvasRenderer(
+                new CanvasRenderer(
+                    mr->vState->vCanvas,
+                    mr->params->width, mr->params->height,
+                    v_frame, v_frame_size
+                )
             );
+            rv = NS_DispatchToMainThread(pCanvasRenderer);
         }
 
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
@@ -325,7 +329,6 @@ MediaRecorder::Encode(void *data)
                 mr, mr->vState->og.body, mr->vState->og.body_len, &wr
             );
         }
-        PR_Free(v_frame);
 
         }
 
@@ -856,3 +859,24 @@ MediaRecorder::Stop()
     return NS_OK;
 }
 
+/* Rendering on Canvas happens on the main thread.
+ * This is not very performant, we should move to rendering inside a <video>
+ * so that Gecko can use hardware acceleration.
+ */
+CanvasRenderer::CanvasRenderer(
+    nsIDOMCanvasRenderingContext2D *pCtx, PRUint32 width, PRUint32 height,
+    nsAutoArrayPtr<PRUint8> &pData, PRUint32 pDataSize)
+    : m_pCtx(pCtx), m_width(width), m_height(height),
+    m_pData(pData), m_pDataSize(pDataSize) {
+}
+CanvasRenderer::~CanvasRenderer() {
+}
+
+NS_IMETHODIMP
+CanvasRenderer::Run() {
+    return m_pCtx->PutImageData_explicit(
+        0, 0, m_width, m_height, m_pData.get(), m_pDataSize
+    );
+}
+
+NS_IMPL_THREADSAFE_ISUPPORTS1(CanvasRenderer, nsIRunnable)

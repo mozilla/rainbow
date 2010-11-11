@@ -156,7 +156,7 @@ ifeq ($(os), WINNT)
     ../lib/WINNT_x86-msvc/libvorbis.lib \
     ../lib/WINNT_x86-msvc/libtheora.lib \
     ../lib/WINNT_x86-msvc/portaudio.lib \
-    strmiids.lib comsuppw.lib ole32.lib user32.lib $(ldops) 
+    strmiids.lib comsuppw.lib ole32.lib user32.lib advapi32.lib $(ldops)
 rcflags := -r $(headers)
 else
 ifeq ($(os), Linux)
