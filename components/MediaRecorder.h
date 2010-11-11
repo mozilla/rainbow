@@ -159,25 +159,4 @@ private:
 
 };
 
-class CanvasRenderer : public nsIRunnable
-{
-public:
-    CanvasRenderer(
-        nsIDOMCanvasRenderingContext2D *pCtx,
-        PRUint32 width, PRUint32 height,
-        nsAutoArrayPtr<PRUint8> &pData,
-        PRUint32 pDataSize);
-    ~CanvasRenderer();
-    NS_DECL_ISUPPORTS
-    NS_DECL_NSIRUNNABLE
-
-private:
-    PRUint32 m_width;
-    PRUint32 m_height;
-    PRUint32 m_pDataSize;
-    nsAutoArrayPtr<PRUint8> m_pData;
-    nsIDOMCanvasRenderingContext2D *m_pCtx;
-
-};
-
 #endif

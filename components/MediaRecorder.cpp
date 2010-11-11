@@ -119,6 +119,35 @@ RGB32toI420(int width, int height, const char *src, char *dst)
     return 0;
 }
 
+/* Rendering on Canvas happens on the main thread as this runnable.
+ * This is not very performant, we should move to rendering inside a <video>
+ * so that Gecko can use hardware acceleration.
+ */
+class CanvasRenderer : public nsRunnable
+{
+public:
+    CanvasRenderer(
+        nsIDOMCanvasRenderingContext2D *pCtx, PRUint32 width, PRUint32 height,
+        nsAutoArrayPtr<PRUint8> &pData, PRUint32 pDataSize)
+        :   m_pCtx(pCtx), m_width(width), m_height(height),
+            m_pData(pData), m_pDataSize(pDataSize) {}
+    
+    NS_IMETHOD Run() {
+        return m_pCtx->PutImageData_explicit(
+            0, 0, m_width, m_height, m_pData.get(), m_pDataSize
+        );
+    }
+
+private:
+    nsIDOMCanvasRenderingContext2D *m_pCtx;
+    PRUint32 m_width;
+    PRUint32 m_height;
+    nsAutoArrayPtr<PRUint8> m_pData;
+    PRUint32 m_pDataSize;
+
+};
+
+
 /*
  * === Here's the meat of the code. Static callbacks & encoder ===
  */
@@ -310,14 +339,12 @@ MediaRecorder::Encode(void *data)
                 pData[j] = tmp;
             }
             
-            nsRefPtr<CanvasRenderer> pCanvasRenderer(
-                new CanvasRenderer(
-                    mr->vState->vCanvas,
-                    mr->params->width, mr->params->height,
-                    v_frame, v_frame_size
-                )
+            nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
+                mr->vState->vCanvas,
+                mr->params->width, mr->params->height,
+                v_frame, v_frame_size
             );
-            rv = NS_DispatchToMainThread(pCanvasRenderer);
+            rv = NS_DispatchToMainThread(render);
         }
 
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
@@ -859,24 +886,3 @@ MediaRecorder::Stop()
     return NS_OK;
 }
 
-/* Rendering on Canvas happens on the main thread.
- * This is not very performant, we should move to rendering inside a <video>
- * so that Gecko can use hardware acceleration.
- */
-CanvasRenderer::CanvasRenderer(
-    nsIDOMCanvasRenderingContext2D *pCtx, PRUint32 width, PRUint32 height,
-    nsAutoArrayPtr<PRUint8> &pData, PRUint32 pDataSize)
-    : m_pCtx(pCtx), m_width(width), m_height(height),
-    m_pData(pData), m_pDataSize(pDataSize) {
-}
-CanvasRenderer::~CanvasRenderer() {
-}
-
-NS_IMETHODIMP
-CanvasRenderer::Run() {
-    return m_pCtx->PutImageData_explicit(
-        0, 0, m_width, m_height, m_pData.get(), m_pDataSize
-    );
-}
-
-NS_IMPL_THREADSAFE_ISUPPORTS1(CanvasRenderer, nsIRunnable)
