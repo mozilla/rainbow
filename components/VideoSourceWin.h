@@ -41,11 +41,15 @@
  * and thus we include parts of qedit.h here.
  */
 
+#include "Convert.h"
 #include "VideoSource.h"
+
 #include <windows.h>
 #include <dshow.h>
+#include <prmem.h>
 
 #define TYPE_BUFFERCB   1
+#define TYPE_SAMPLECB   0
 #define NANOSECONDS     10000000
 
 /* Begin qedit.h */
@@ -75,6 +79,8 @@ static const
 CLSID CLSID_SampleGrabber = { 0xC1F400A0, 0x3F08, 0x11d3, { 0x9F, 0x0B, 0x00, 0x60, 0x08, 0x03, 0x9E, 0x37 } };
 static const
 CLSID CLSID_NullRenderer = { 0xC1F400A4, 0x3F08, 0x11d3, { 0x9F, 0x0B, 0x00, 0x60, 0x08, 0x03, 0x9E, 0x37 } };
+static const
+GUID MEDIASUBTYPE_I420 = { 0x30323449, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
 
 #define SAFE_RELEASE(x) { if (x) x->Release(); x = NULL; }
 /* End qedit.h */
@@ -82,7 +88,7 @@ CLSID CLSID_NullRenderer = { 0xC1F400A4, 0x3F08, 0x11d3, { 0x9F, 0x0B, 0x00, 0x6
 class VideoSourceWinCallback : public ISampleGrabberCB
 {
 public:
-    VideoSourceWinCallback(nsIOutputStream *pipe);
+    VideoSourceWinCallback(nsIOutputStream *pipe, int w, int h, PRBool rgb);
 
     STDMETHODIMP_(ULONG) AddRef();
     STDMETHODIMP_(ULONG) Release();
@@ -91,6 +97,9 @@ public:
     STDMETHODIMP BufferCB(double Time, BYTE *pBuffer, long BufferLen);
 
 private:
+    int w;
+    int h;
+    PRBool doRGB;
     int m_refCount;
     nsIOutputStream *output;
     IID m_IID_ISampleGrabberCB;
@@ -107,6 +116,7 @@ public:
     nsresult Start(nsIOutputStream *pipe);
 
 protected:
+    PRBool doRGB;
     IMediaControl *pMC;
     IGraphBuilder *pGraph;
     ICaptureGraphBuilder2 *pCapture;

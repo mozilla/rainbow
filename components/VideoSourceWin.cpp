@@ -49,7 +49,7 @@ _FreeMediaType(AM_MEDIA_TYPE &mt)
     }
     if (mt.pUnk != NULL)
     {
-        // pUnk should not be used.
+        /* pUnk should not be used. */
         mt.pUnk->Release();
         mt.pUnk = NULL;
     }
@@ -95,14 +95,15 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
     }
     
     if (pClassEnum == NULL) {
-        // No devices available
+        /* No devices available */
         SAFE_RELEASE(pDevEnum);
         return E_FAIL;
     }
 
-    // Pick the first device from the list.
-    // Note that if the Next() call succeeds but there are no monikers,
-    // it will return S_FALSE (which is not a failure).
+    /* Pick the first device from the list.
+     * Note that if the Next() call succeeds but there are no monikers,
+     * it will return S_FALSE (which is not a failure).
+     */
     hr = pClassEnum->Next (1, &pMoniker, NULL);
     if (hr == S_FALSE) {
         SAFE_RELEASE(pDevEnum);
@@ -160,14 +161,14 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     hr = GetDefaultInputDevice(&pSrcFilter);
     if (FAILED(hr)) return;
 
-    // Add capture device to graph
+    /* Add capture device to graph */
     hr = pGraph->AddFilter(pSrcFilter, L"Video Capture");
     if (FAILED(hr)) {
         pSrcFilter->Release();
         return;
     }
 
-    // Create SampleGrabber
+    /* Create SampleGrabber */
     hr = CoCreateInstance(
         CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER,
         IID_PPV_ARGS(&pGrabberF)
@@ -182,7 +183,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
         return;
     }
  
-    // Create Null Renderer (required sink by ISampleGrabber)
+    /* Create Null Renderer (required sink by ISampleGrabber) */
     hr = CoCreateInstance(
         CLSID_NullRenderer, NULL, CLSCTX_INPROC_SERVER,
         IID_IBaseFilter, (void **)&pNullF
@@ -192,7 +193,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
         return;
     }
     
-    // Get default media type values and set what we need
+    /* Get default media type values and set what we need */
     hr = pCapture->FindInterface(
         &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, pSrcFilter,
         IID_IAMStreamConfig, (void**)&pConfig
@@ -203,14 +204,22 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     }
     
     hr = pConfig->GetFormat(&pMT);
+    
+    /* If i420 is not available do RGB32 instead */
+    if (pMT->subtype != MEDIASUBTYPE_I420) {
+        pMT->subtype = MEDIASUBTYPE_ARGB32;
+        doRGB = PR_TRUE;
+    } else {
+        pVid->bmiHeader.biCompression = 'VUYI';
+        doRGB = PR_FALSE;
+    }
     pMT->majortype = MEDIATYPE_Video;
-    pMT->subtype = MEDIASUBTYPE_ARGB32;
     pMT->formattype = FORMAT_VideoInfo;
     pVid = reinterpret_cast<VIDEOINFOHEADER*>(pMT->pbFormat);
     pVid->bmiHeader.biWidth = width;
-    pVid->bmiHeader.biHeight = -height;
+    pVid->bmiHeader.biHeight = height;
     
-    // Set frame rates
+    /* Set frame rates */
     fps_n = NANOSECONDS;
     fps_d = (PRUint32)pVid->AvgTimePerFrame;
 
@@ -218,7 +227,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     pGrabber->SetMediaType(pMT);
     _DeleteMediaType(pMT);
     
-    // Instance initialized properly
+    /* Instance initialized properly */
     SAFE_RELEASE(pConfig);
     g2g = PR_TRUE;
 }
@@ -243,26 +252,26 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
     if (!g2g)
         return NS_ERROR_FAILURE;
     
-    // Set our callback
+    /* Set our callback */
     pGrabber->SetBufferSamples(TRUE);
-    cb = new VideoSourceWinCallback(pipe);
+    cb = new VideoSourceWinCallback(pipe, width, height, doRGB);
     hr = pGrabber->SetCallback(cb, TYPE_BUFFERCB);
     
-    // Add Sample Grabber to graph
+    /* Add Sample Grabber to graph */
     hr = pGraph->AddFilter(pGrabberF, L"Sample Grabber");
     if (FAILED(hr)) {
         SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
 
-    // Add Null Renderer to graph
+    /* Add Null Renderer to graph */
     hr = pGraph->AddFilter(pNullF, L"Null Filter");
     if (FAILED(hr)) {
         SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
 
-    // Connect capture pin to sample grabber, and that to null renderer
+    /* Connect capture pin to sample grabber, and that to null renderer */
     hr = pCapture->RenderStream(
         &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
         pSrcFilter, pGrabberF, pNullF
@@ -291,9 +300,13 @@ VideoSourceWin::Stop()
     return NS_OK;
 }
 
-// Callback class
-VideoSourceWinCallback::VideoSourceWinCallback(nsIOutputStream *pipe)
+/* Callback class */
+VideoSourceWinCallback::VideoSourceWinCallback(
+    nsIOutputStream *pipe, int width, int height, PRBool rgb)
 {
+    w = width;
+    h = height;
+    doRGB = rgb;
     output = pipe;
     m_refCount = 0;
 }
@@ -343,20 +356,37 @@ STDMETHODIMP
 VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
 {
     nsresult rv;
-    PRUint32 wr, tmp;
-    PRInt32 start, end, offset;
+    PRUint32 wr;
+    PRUint8 tmp;
+    PRUint8 *i420buf;
+    int i, start, end, bpp, fsize, isize, off;
     
-    // We always get inverted RGB values. Fix until we switch to i420
-    PRInt32 bytesPerPixel = 4;
-    for (start = 0, end = bufferLen - bytesPerPixel; start < bufferLen / 2;
-        start += bytesPerPixel, end -= bytesPerPixel) {
+    /* If camera didn't support i420, convert from RGB32 */
+    if (doRGB) {
+        bpp = 4;
         
-        for (offset = 0; offset < bytesPerPixel; offset += 1) {
-            tmp = pBuffer[start + offset];
-            pBuffer[start + offset] = pBuffer[end + offset];
-            pBuffer[end + offset] = tmp;
+        /* Reverse top-down */
+        for (start = 0, end = bufferLen - bpp; start < bufferLen / 2;
+            start += bpp, end -= bpp) {
+            for (off = 0; off < bpp; off += 1) {
+                tmp = pBuffer[start + off];
+                pBuffer[start + off] = pBuffer[end + off];
+                pBuffer[end + off] = tmp;
+            }
         }
+        
+        /* Change to i420 */
+        fsize = w * h * 4;
+        isize = w * h * 3 / 2;
+        for (i = 0; i < bufferLen / fsize; i++) {
+            i420buf = (PRUint8 *)PR_Calloc(isize, sizeof(PRUint8));
+            RGB32toI420(w, h, (const char *)pBuffer + i * fsize, (char *)i420buf);
+            rv = output->Write((const char *)i420buf, isize, &wr);
+            PR_Free(i420buf);
+        }
+    } else {
+        rv = output->Write((const char *)pBuffer, bufferLen, &wr);
     }
-    rv = output->Write((const char *)pBuffer, bufferLen, &wr);
+    
     return S_OK;
 }
