@@ -441,8 +441,10 @@ MediaRecorder::~MediaRecorder()
 nsresult
 MediaRecorder::SetupTheoraBOS()
 {
+    int i;
     nsresult rv;
     PRUint32 wr;
+    ogg_uint32_t keyframe;
 
     if (ogg_stream_init(&vState->os, rand())) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed ogg_stream_init\n"));
@@ -450,25 +452,25 @@ MediaRecorder::SetupTheoraBOS()
     }
     
     th_info_init(&vState->ti);
+
     /* Must be multiples of 16 */
-    vState->ti.frame_width = ((params->width + 15) >> 4) << 4;
-    vState->ti.frame_height = ((params->height + 15) >> 4) << 4;
+    vState->ti.frame_width = params->width + 15 & ~0xF;
+    vState->ti.frame_height = params->height + 15 & ~0xF;
     vState->ti.pic_width = params->width;
     vState->ti.pic_height = params->height;
-    vState->ti.pic_x = 0;
-    vState->ti.pic_y = 0;
-    
-    /* Too fast? Why? */
+    vState->ti.pic_x = vState->ti.frame_width - params->width >> 1 & ~1;
+    vState->ti.pic_y = vState->ti.frame_height - params->height >> 1 & ~1;
     vState->ti.fps_numerator = params->fps_n;
     vState->ti.fps_denominator = params->fps_d;
-    vState->ti.aspect_numerator = 0;
-    vState->ti.aspect_denominator = 0;
-    vState->ti.target_bitrate = 0;
 
-    /* Are these the right values? */ 
+    /* Are these the right values? */
+    keyframe = 64 - 1;
+    for (i = 0; keyframe; i++)
+        keyframe >>= 1;
     vState->ti.quality = (int)(params->qual * 100);
-    vState->ti.colorspace = TH_CS_UNSPECIFIED;
+    vState->ti.colorspace = TH_CS_ITU_REC_470M;
     vState->ti.pixel_fmt = TH_PF_420;
+    vState->ti.keyframe_granule_shift = i;
 
     vState->th = th_encode_alloc(&vState->ti);
     th_info_clear(&vState->ti);
@@ -699,10 +701,6 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
     if (NS_FAILED(rv)) params->audio = PR_TRUE; 
     rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("video"), &params->video);
     if (NS_FAILED(rv)) params->video = PR_TRUE;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_n"), &params->fps_n);
-    if (NS_FAILED(rv)) params->fps_n = FPS_N;
-    rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("fps_d"), &params->fps_d);
-    if (NS_FAILED(rv)) params->fps_d = FPS_D;
     rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("width"), &params->width);
     if (NS_FAILED(rv)) params->width = WIDTH;
     rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("height"), &params->height);
@@ -729,15 +727,15 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
 
     /* Setup video backend */
     #ifdef RAINBOW_Mac
-    vState->backend = new VideoSourceMac(
-        params->fps_n, params->fps_d, params->width, params->height
-    );
+    vState->backend = new VideoSourceMac(params->width, params->height);
     #endif
     #ifdef RAINBOW_Win
-    vState->backend = new VideoSourceWin(
-        params->fps_n, params->fps_d, params->width, params->height
-    );
+    vState->backend = new VideoSourceWin(params->width, params->height);
     #endif
+
+    /* Update fps */
+    params->fps_n = vState->backend->GetFPSN();
+    params->fps_d = vState->backend->GetFPSD();
 
     /* Audio backend same for all platforms */
     aState->backend = new AudioSourcePortaudio(

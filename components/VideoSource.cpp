@@ -36,10 +36,8 @@
 
 #include "VideoSource.h"
 
-VideoSource::VideoSource(int n, int d, int w, int h)
+VideoSource::VideoSource(int w, int h)
 {
-    fps_n = n;
-    fps_d = d;
     width = w;
     height = h;
 
@@ -52,5 +50,17 @@ VideoSource::GetFrameSize()
 {
     /* RGB32 is 4 bytes per pixel */
     return width * height * 4;
+}
+
+PRUint32
+VideoSource::GetFPSN()
+{
+    return fps_n;
+}
+
+PRUint32
+VideoSource::GetFPSD()
+{
+    return fps_d;
 }
 

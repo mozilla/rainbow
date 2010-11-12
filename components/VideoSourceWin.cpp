@@ -102,8 +102,8 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
     return hr;
 }
 
-VideoSourceWin::VideoSourceWin(int n, int d, int w, int h)
-    : VideoSource(n, d, w, h)
+VideoSourceWin::VideoSourceWin(int w, int h)
+    : VideoSource(w, h)
 {
     HRESULT hr;
     g2g = PR_FALSE;

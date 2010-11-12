@@ -100,14 +100,13 @@ private:
 class VideoSourceWin : public VideoSource
 {
 public:
-    VideoSourceWin(int n, int d, int w, int h);
+    VideoSourceWin(int w, int h);
     ~VideoSourceWin();
 
     nsresult Stop();
     nsresult Start(nsIOutputStream *pipe);
 
 protected:
-    PRBool g2g;
     IMediaControl *pMC;
     IGraphBuilder *pGraph;
     ICaptureGraphBuilder2 *pCapture;

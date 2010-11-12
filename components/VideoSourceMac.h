@@ -47,7 +47,7 @@
 
 class VideoSourceMac : public VideoSource {
 public:
-    VideoSourceMac(int n, int d, int w, int h);
+    VideoSourceMac(int w, int h);
     ~VideoSourceMac();
 
     nsresult Stop();
@@ -59,6 +59,7 @@ protected:
     vidcap_state *state;
     nsIOutputStream *output;
     struct vidcap_src_info *sources;
+    struct vidcap_fmt_info fmt_info;
 
     static int Callback(
         vidcap_src *src, void *data, struct vidcap_capture_info *video

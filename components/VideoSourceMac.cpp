@@ -36,12 +36,14 @@
 
 #include "VideoSourceMac.h"
 
-VideoSourceMac::VideoSourceMac(int n, int d, int w, int h)
-    : VideoSource(n, d, w, h)
+VideoSourceMac::VideoSourceMac(int w, int h)
+    : VideoSource(w, h)
 {
     /* Setup video devices */
     int nd = 0;
     struct vidcap_sapi_info sapi_info;
+    g2g = PR_FALSE;
+
     if (!(state = vidcap_initialize())) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not initialize vidcap\n"));
         return;
@@ -74,6 +76,45 @@ VideoSourceMac::VideoSourceMac(int n, int d, int w, int h)
             return;
         }
     }
+
+    /* Get default fmt_info, set our height/width and set it back */
+    if (!(source = vidcap_src_acquire(sapi, &sources[0]))) {
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_acquire\n"));
+        PR_Free(sources);
+        return;
+    }
+    if (vidcap_format_bind(source, 0)) {
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_format_bind\n"));
+        PR_Free(sources);
+        return;
+    }
+    if (vidcap_format_info_get(source, &fmt_info)) {
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_format_bind\n"));
+        PR_Free(sources);
+        return;
+    }
+
+    /* FIXME: We're requesting i420 but converting to RGB32 because libvidcap
+     * returns side-scrolling, incorrect video when we request RGB32. We are
+     * converting back to i420 (so we can get ycbcr) in the mutliplexer so this
+     * is duplication but most cameras return RGB32 and the problem will go
+     * go away when we switch to Quicktime
+     */
+    fmt_info.width = width;
+    fmt_info.height = height;
+    fmt_info.fourcc = VIDCAP_FOURCC_I420;
+    fps_n = fmt_info.fps_numerator;
+    fps_d = fmt_info.fps_denominator;
+    
+    if (vidcap_format_bind(source, &fmt_info)) {
+        PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_format_bind\n"));
+        PR_Free(sources);
+        return;
+    }
+
+    vidcap_src_release(source);
+    PR_Free(sources);
+    g2g = PR_TRUE;
 }
 
 VideoSourceMac::~VideoSourceMac()
@@ -86,25 +127,14 @@ VideoSourceMac::~VideoSourceMac()
 nsresult
 VideoSourceMac::Start(nsIOutputStream *pipe)
 {
-    struct vidcap_fmt_info fmt_info;
-    fmt_info.width = width;
-    fmt_info.height = height;
-    fmt_info.fps_numerator = fps_n;
-    fmt_info.fps_denominator = fps_d;
+    if (!g2g)
+        return NS_ERROR_FAILURE;
 
-    /* FIXME: We're requesting i420 but converting to RGB32 because libvidcap
-     * returns side-scrolling, incorrect video when we request RGB32. We are
-     * converting back to i420 (so we can get ycbcr) in the mutliplexer so this
-     * is duplication but most cameras return RGB32 and the problem will go
-     * go away when we switch to Quicktime
-     */
-    fmt_info.fourcc = VIDCAP_FOURCC_I420;
-    
     if (!(source = vidcap_src_acquire(sapi, &sources[0]))) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_acquire\n"));
         return NS_ERROR_FAILURE;
     }
-       
+
     if (vidcap_format_bind(source, &fmt_info)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_format_bind\n"));
         return NS_ERROR_FAILURE;
@@ -122,12 +152,15 @@ VideoSourceMac::Start(nsIOutputStream *pipe)
 nsresult
 VideoSourceMac::Stop()
 {
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+
     if (vidcap_src_capture_stop(source)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_capture_stop\n"));
         return NS_ERROR_FAILURE;
     }
-
     vidcap_src_release(source);
+
     return NS_OK;
 }
 

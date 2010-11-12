@@ -50,19 +50,27 @@
 class VideoSource {
 public:
     /* Re-use the constructor and frame size getter */
-    VideoSource(int fps_n, int fps_d, int width, int height);
+    VideoSource(int width, int height);
     int GetFrameSize();
+    PRUint32 GetFPSN();
+    PRUint32 GetFPSD();
 
     /* Implement these two. Write RGB32 samples to pipe */
     virtual nsresult Stop() = 0;
     virtual nsresult Start(nsIOutputStream *pipe) = 0;
+    
 
 protected:
+    /* Zombie notifier */
+    PRBool g2g;
+
+    /* You MUST set these two values in the constructor! */
     int fps_n;
     int fps_d;
+
+    /* These three values are automatically set in the default constructor */
     int width;
     int height;
-
     PRLogModuleInfo *log;
 
 };

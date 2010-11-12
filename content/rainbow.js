@@ -45,7 +45,7 @@ let Rainbow = {
 
     _makePropertyBag: function(prop) {
         let bP = ["audio", "video"];
-        let iP = ["fps_n", "fps_d", "width", "height", "channels", "rate"];
+        let iP = ["width", "height", "channels", "rate"];
         let dP = ["quality"];
 
         let bag = Cc["@mozilla.org/hash-property-bag;1"].
