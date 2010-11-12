@@ -394,8 +394,8 @@ MediaRecorder::SetupTheoraBOS()
     vState->ti.frame_height = params->height + 15 & ~0xF;
     vState->ti.pic_width = params->width;
     vState->ti.pic_height = params->height;
-    vState->ti.pic_x = vState->ti.frame_width - params->width >> 1 & ~1;
-    vState->ti.pic_y = vState->ti.frame_height - params->height >> 1 & ~1;
+    vState->ti.pic_x = (vState->ti.frame_width - params->width) >> 1 & ~1;
+    vState->ti.pic_y = (vState->ti.frame_height - params->height) >> 1 & ~1;
     vState->ti.fps_numerator = params->fps_n;
     vState->ti.fps_denominator = params->fps_d;
 
