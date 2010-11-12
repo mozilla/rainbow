@@ -116,6 +116,9 @@ protected:
     IBaseFilter *pSrcFilter;
     ISampleGrabber *pGrabber;
 
+    AM_MEDIA_TYPE *pMT;
+    IAMStreamConfig *pConfig;
+    
     VideoSourceWinCallback *cb;
 
 };

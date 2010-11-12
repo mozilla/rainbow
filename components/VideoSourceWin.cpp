@@ -37,9 +37,36 @@
 
 #include "VideoSourceWin.h"
 
-/*
- * Try to intelligently fetch a default video input device
- */
+/* Release the format block for a media type */
+static void
+_FreeMediaType(AM_MEDIA_TYPE &mt)
+{
+    if (mt.cbFormat != 0)
+    {
+        CoTaskMemFree((PVOID)mt.pbFormat);
+        mt.cbFormat = 0;
+        mt.pbFormat = NULL;
+    }
+    if (mt.pUnk != NULL)
+    {
+        // pUnk should not be used.
+        mt.pUnk->Release();
+        mt.pUnk = NULL;
+    }
+}
+
+/* Delete a media type structure that was allocated on the heap */
+static void
+_DeleteMediaType(AM_MEDIA_TYPE *pmt)
+{
+    if (pmt != NULL)
+    {
+        _FreeMediaType(*pmt); 
+        CoTaskMemFree(pmt);
+    }
+}
+
+/* Try to intelligently fetch a default video input device */
 static HRESULT
 GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
 {
@@ -106,6 +133,8 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     : VideoSource(w, h)
 {
     HRESULT hr;
+    VIDEOINFOHEADER *pVid;
+    
     g2g = PR_FALSE;
 
     hr = CoInitialize(0);
@@ -162,8 +191,35 @@ VideoSourceWin::VideoSourceWin(int w, int h)
         pSrcFilter->Release();
         return;
     }
+    
+    // Get default media type values and set what we need
+    hr = pCapture->FindInterface(
+        &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, pSrcFilter,
+        IID_IAMStreamConfig, (void**)&pConfig
+    );
+    if (FAILED(hr)) {
+        pSrcFilter->Release();
+        return;
+    }
+    
+    hr = pConfig->GetFormat(&pMT);
+    pMT->majortype = MEDIATYPE_Video;
+    pMT->subtype = MEDIASUBTYPE_ARGB32;
+    pMT->formattype = FORMAT_VideoInfo;
+    pVid = reinterpret_cast<VIDEOINFOHEADER*>(pMT->pbFormat);
+    pVid->bmiHeader.biWidth = width;
+    pVid->bmiHeader.biHeight = -height;
+    
+    // Set frame rates
+    fps_n = NANOSECONDS;
+    fps_d = (PRUint32)pVid->AvgTimePerFrame;
 
+    pConfig->SetFormat(pMT);
+    pGrabber->SetMediaType(pMT);
+    _DeleteMediaType(pMT);
+    
     // Instance initialized properly
+    SAFE_RELEASE(pConfig);
     g2g = PR_TRUE;
 }
 
@@ -183,45 +239,18 @@ nsresult
 VideoSourceWin::Start(nsIOutputStream *pipe)
 {
     HRESULT hr;
-    AM_MEDIA_TYPE *pCapmt;
-    VIDEOINFOHEADER *pVid;
-    IAMStreamConfig *pConfig;
     
     if (!g2g)
         return NS_ERROR_FAILURE;
-
-    hr = pCapture->FindInterface(
-        &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, pSrcFilter,
-        IID_IAMStreamConfig, (void**)&pConfig
-    );
-    if (FAILED(hr)) {
-        pSrcFilter->Release();
-        return NS_ERROR_FAILURE;
-    }
-    
-    hr = pConfig->GetFormat(&pCapmt);
-
-    pCapmt->majortype = MEDIATYPE_Video;
-    pCapmt->subtype = MEDIASUBTYPE_ARGB32;
-    pCapmt->formattype = FORMAT_VideoInfo;
-
-    pVid = reinterpret_cast<VIDEOINFOHEADER*>(pCapmt->pbFormat);
-    pVid->bmiHeader.biWidth = width;
-    pVid->bmiHeader.biHeight = -height;
-    pVid->AvgTimePerFrame = NANOSECONDS * (fps_n / fps_d);
-
-    pConfig->SetFormat(pCapmt);
-    pGrabber->SetMediaType(pCapmt);
-    pGrabber->SetBufferSamples(TRUE);
     
     // Set our callback
+    pGrabber->SetBufferSamples(TRUE);
     cb = new VideoSourceWinCallback(pipe);
     hr = pGrabber->SetCallback(cb, TYPE_BUFFERCB);
     
     // Add Sample Grabber to graph
     hr = pGraph->AddFilter(pGrabberF, L"Sample Grabber");
     if (FAILED(hr)) {
-        SAFE_RELEASE(pConfig);
         SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
@@ -229,7 +258,6 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
     // Add Null Renderer to graph
     hr = pGraph->AddFilter(pNullF, L"Null Filter");
     if (FAILED(hr)) {
-        SAFE_RELEASE(pConfig);
         SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
@@ -240,12 +268,10 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
         pSrcFilter, pGrabberF, pNullF
     );
     if (FAILED(hr)) {
-        SAFE_RELEASE(pConfig);
         SAFE_RELEASE(pSrcFilter);
         return NS_ERROR_FAILURE;
     }
 
-    SAFE_RELEASE(pConfig);
     SAFE_RELEASE(pSrcFilter);
 
     hr = pMC->Run();
