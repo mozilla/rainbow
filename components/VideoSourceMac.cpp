@@ -42,8 +42,8 @@ VideoSourceMac::VideoSourceMac(int w, int h)
     /* Setup video devices */
     int nd = 0;
     struct vidcap_sapi_info sapi_info;
-    g2g = PR_FALSE;
 
+    g2g = PR_FALSE;
     if (!(state = vidcap_initialize())) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not initialize vidcap\n"));
         return;
@@ -94,12 +94,6 @@ VideoSourceMac::VideoSourceMac(int w, int h)
         return;
     }
 
-    /* FIXME: We're requesting i420 but converting to RGB32 because libvidcap
-     * returns side-scrolling, incorrect video when we request RGB32. We are
-     * converting back to i420 (so we can get ycbcr) in the mutliplexer so this
-     * is duplication but most cameras return RGB32 and the problem will go
-     * go away when we switch to Quicktime
-     */
     fmt_info.width = width;
     fmt_info.height = height;
     fmt_info.fourcc = VIDCAP_FOURCC_I420;
@@ -113,7 +107,6 @@ VideoSourceMac::VideoSourceMac(int w, int h)
     }
 
     vidcap_src_release(source);
-    PR_Free(sources);
     g2g = PR_TRUE;
 }
 
@@ -168,28 +161,13 @@ int
 VideoSourceMac::Callback(
     vidcap_src *src, void *data, struct vidcap_capture_info *video)
 {
-    /*
-     * See note above to see when this ugliness will go away.
-     */
-    VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
-
     nsresult rv;
     PRUint32 wr;
-    char *rgbptr;
-    char *i420ptr;
-    int rgbfsize = vsm->GetFrameSize();
-    int i420fsize = vsm->width * vsm->height * 3 / 2;
-    int frames = video->video_data_size  / i420fsize;
-    char *rgb = (char *)PR_Calloc(rgbfsize, frames);
+    VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
 
-    for (int i = 0; i < frames; i++) {
-        rgbptr = rgb + (i * rgbfsize);
-        i420ptr = (char *)video->video_data + (i * i420fsize);
-        vidcap_i420_to_rgb32(vsm->width, vsm->height, i420ptr, rgbptr);
-    }
-
-    rv = vsm->output->Write((const char *)rgb, rgbfsize * frames, &wr);
-    PR_Free(rgb);
+    rv = vsm->output->Write(
+        (const char *)video->video_data, video->video_data_size, &wr
+    );
     return 0;
 }
 

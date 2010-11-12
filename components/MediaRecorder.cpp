@@ -56,68 +56,6 @@ MediaRecorder::GetSingleton()
     return gMediaRecordingService;
 }
 
-/* 
- * Convert RGB32 to i420. NOTE: size of dest must be >= width * height * 3 / 2
- * Based on formulas found at http://en.wikipedia.org/wiki/YUV  (libvidcap)
- */
-static int
-RGB32toI420(int width, int height, const char *src, char *dst)
-{
-    int i, j;
-    unsigned char *dst_y_even;
-    unsigned char *dst_y_odd;
-    unsigned char *dst_u;
-    unsigned char *dst_v;
-    const unsigned char *src_even;
-    const unsigned char *src_odd;
-
-    src_even = (const unsigned char *)src;
-    src_odd = src_even + width * 4;
-
-    dst_y_even = (unsigned char *)dst;
-    dst_y_odd = dst_y_even + width;
-    dst_u = dst_y_even + width * height;
-    dst_v = dst_u + ((width * height) >> 2);
-
-    for (i = 0; i < height / 2; ++i) {
-        for (j = 0; j < width / 2; ++j) {
-            short r, g, b;
-            b = *src_even++;
-            g = *src_even++;
-            r = *src_even++;
-            ++src_even;
-            *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
-
-            *dst_u++ = (( r * -38 - g * 74 + b * 112 + 128 ) >> 8 ) + 128;
-            *dst_v++ = (( r * 112 - g * 94 - b * 18 + 128 ) >> 8 ) + 128;
-
-            b = *src_even++;
-            g = *src_even++;
-            r = *src_even++;
-            ++src_even;
-            *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
-
-            b = *src_odd++;
-            g = *src_odd++;
-            r = *src_odd++;
-            ++src_odd;
-            *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
-
-            b = *src_odd++;
-            g = *src_odd++;
-            r = *src_odd++;
-            ++src_odd;
-            *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
-        }
-
-        dst_y_odd += width;
-        dst_y_even += width;
-        src_odd += width * 4;
-        src_even += width * 4;
-    }
-
-    return 0;
-}
 
 /* Rendering on Canvas happens on the main thread as this runnable.
  * This is not very performant, we should move to rendering inside a <video>
@@ -236,7 +174,8 @@ MediaRecorder::Encode(void *data)
     PRUint32 wr;
     PRUint32 rd = 0;
 
-    char *a_frame;
+    PRUint8 *a_frame;
+    PRUint8 *v_frame;
     float **a_buffer;
     th_ycbcr_buffer v_buffer;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
@@ -274,17 +213,20 @@ MediaRecorder::Encode(void *data)
         if (mr->v_rec) {
 
         /* Make sure we get 1 full frame of video */
-        nsAutoArrayPtr<PRUint8> v_frame(new PRUint8[v_frame_size]);
+        v_frame = (PRUint8 *)PR_Calloc(v_frame_size, sizeof(PRUint8));
         do mr->vState->vPipeIn->Available(&rd);
             while ((rd < (PRUint32)v_frame_size) && !mr->v_stp);
-        rv = mr->vState->vPipeIn->Read((char *)v_frame.get(), v_frame_size, &rd);
+        rv = mr->vState->vPipeIn->Read((char *)v_frame, v_frame_size, &rd);
 
         if (rd == 0) {
             /* EOF. If there's audio we need to finish it. Goto: gasp! */
-            if (mr->a_rec)
+            if (mr->a_rec) {
+                PR_Free(v_frame);
                 goto audio_enc;
-            else
+            } else {
+                PR_Free(v_frame);
                 return;
+            }
         } else if (rd != (PRUint32)v_frame_size) {
             /* Now, we're in a pickle. HOW TO FIXME? */
             PR_LOG(mr->log, PR_LOG_NOTICE,
@@ -292,13 +234,6 @@ MediaRecorder::Encode(void *data)
             PR_Free(v_frame);
             return;
         }
-
-        /* Convert RGB32 to i420 */
-        nsAutoArrayPtr<PRUint8> i420(
-            new PRUint8[mr->params->width * mr->params->height * 3 / 2]);
-
-        RGB32toI420(mr->params->width, mr->params->height,
-            (const char *)v_frame.get(), (char *)i420.get());
 
         /* Convert i420 to YCbCr */
         v_buffer[0].width = mr->params->width;
@@ -313,36 +248,36 @@ MediaRecorder::Encode(void *data)
         v_buffer[2].height = v_buffer[1].height;
         v_buffer[2].stride = v_buffer[1].stride;
 
-        v_buffer[0].data = i420.get();
-        v_buffer[1].data = i420.get() + v_buffer[0].width * v_buffer[0].height;
+        v_buffer[0].data = v_frame;
+        v_buffer[1].data = v_frame + v_buffer[0].width * v_buffer[0].height;
         v_buffer[2].data =
             v_buffer[1].data + v_buffer[0].width * v_buffer[0].height / 4;
 
         /* Encode 'er up */
         if (th_encode_ycbcr_in(mr->vState->th, v_buffer) != 0) {
             PR_LOG(mr->log, PR_LOG_NOTICE, ("Could not encode frame\n"));
+            PR_Free(v_frame);
             return;
         }
         if (!th_encode_packetout(mr->vState->th, 0, &mr->vState->op)) {
             PR_LOG(mr->log, PR_LOG_NOTICE, ("Could not read packet\n"));
+            PR_Free(v_frame);
             return;
         }
         
         /* Write to canvas, if needed */
         if (mr->vState->vCanvas) {
-            /* OSes give us BGRA but we want RGBA */
-            PRUint8 tmp = 0;
-            PRUint8 *pData = v_frame.get();
-            for (int j = 0; j < v_frame_size; j += 4) {
-                tmp = pData[j+2];
-                pData[j+2] = pData[j];
-                pData[j] = tmp;
-            }
-            
+            /* Convert RGB32 to i420 */
+            nsAutoArrayPtr<PRUint8> rgb32(
+                new PRUint8[mr->params->width * mr->params->height * 4]
+            );
+            I420toRGB32(mr->params->width, mr->params->height,
+                (const char *)v_frame, (char *)rgb32.get());
+
             nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
                 mr->vState->vCanvas,
                 mr->params->width, mr->params->height,
-                v_frame, v_frame_size
+                rgb32, mr->params->width * mr->params->height * 4
             );
             rv = NS_DispatchToMainThread(render);
         }
@@ -356,6 +291,7 @@ MediaRecorder::Encode(void *data)
                 mr, mr->vState->og.body, mr->vState->og.body_len, &wr
             );
         }
+        PR_Free(v_frame);
 
         }
 
@@ -364,7 +300,7 @@ audio_enc:
         if (mr->a_rec) {
              
         /* Make sure we get enough frames in unless we're at the end */
-        a_frame = (char *) PR_Calloc(1, a_frame_total);
+        a_frame = (PRUint8 *) PR_Calloc(a_frame_total, sizeof(PRUint8));
 
         do mr->aState->aPipeIn->Available(&rd);
             while ((rd < (PRUint32)a_frame_total) && !mr->a_stp);

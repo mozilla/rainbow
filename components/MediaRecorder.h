@@ -38,6 +38,7 @@
 #ifndef MediaRecorder_h_
 #define MediaRecorder_h_
 
+#include "Convert.h"
 #include "IMediaRecorder.h"
 
 #include <ogg/ogg.h>

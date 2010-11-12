@@ -55,7 +55,7 @@ public:
     PRUint32 GetFPSN();
     PRUint32 GetFPSD();
 
-    /* Implement these two. Write RGB32 samples to pipe */
+    /* Implement these two. Write i420 samples to pipe */
     virtual nsresult Stop() = 0;
     virtual nsresult Start(nsIOutputStream *pipe) = 0;
     

@@ -48,8 +48,8 @@ VideoSource::VideoSource(int w, int h)
 int
 VideoSource::GetFrameSize()
 {
-    /* RGB32 is 4 bytes per pixel */
-    return width * height * 4;
+    /* i420 is 3/2 bytes per pixel */
+    return width * height * 3 / 2;
 }
 
 PRUint32

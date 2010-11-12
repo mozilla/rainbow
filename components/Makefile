@@ -54,7 +54,7 @@ so_target = $(target:=.$(so))
 
 # source and path configurations
 idl = IMediaRecorder.idl
-cpp_sources = MediaRecorder.cpp MediaModule.cpp \
+cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
     VideoSource.cpp VideoSource$(teh).cpp \
     AudioSource.cpp AudioSourcePortaudio.cpp
 
