@@ -207,7 +207,7 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
 
     pVid = reinterpret_cast<VIDEOINFOHEADER*>(pCapmt->pbFormat);
     pVid->bmiHeader.biWidth = width;
-    pVid->bmiHeader.biHeight = height;
+    pVid->bmiHeader.biHeight = -height;
     pVid->AvgTimePerFrame = NANOSECONDS * (fps_n / fps_d);
 
     pConfig->SetFormat(pCapmt);
@@ -314,11 +314,23 @@ VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
 }
 
 STDMETHODIMP
-VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long BufferLen)
+VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
 {
     nsresult rv;
-    PRUint32 wr;
-
-    rv = output->Write((const char *)pBuffer, BufferLen, &wr);
+    PRUint32 wr, tmp;
+    PRInt32 start, end, offset;
+    
+    // We always get inverted RGB values. Fix until we switch to i420
+    PRInt32 bytesPerPixel = 4;
+    for (start = 0, end = bufferLen - bytesPerPixel; start < bufferLen / 2;
+        start += bytesPerPixel, end -= bytesPerPixel) {
+        
+        for (offset = 0; offset < bytesPerPixel; offset += 1) {
+            tmp = pBuffer[start + offset];
+            pBuffer[start + offset] = pBuffer[end + offset];
+            pBuffer[end + offset] = tmp;
+        }
+    }
+    rv = output->Write((const char *)pBuffer, bufferLen, &wr);
     return S_OK;
 }

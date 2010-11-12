@@ -42,8 +42,8 @@
 #include <nsIOutputStream.h>
 
 /* Defaults */
-#define FPS_N   12
-#define FPS_D   1
+#define FPS_N   30000
+#define FPS_D   1001
 #define WIDTH   640
 #define HEIGHT  480
 
