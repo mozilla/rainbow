@@ -36,6 +36,103 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "VideoSourceWin.h"
+#include "nsStringAPI.h"
+
+IID IID_ISampleGrabber;
+IID IID_ISampleGrabberCB;
+CLSID CLSID_SampleGrabber;
+CLSID CLSID_NullRenderer;
+
+static NS_NAMED_LITERAL_STRING(kFilenameQeditTypeLib, "qedit.dll");
+static NS_NAMED_LITERAL_STRING(kNameISampleGrabber, "ISampleGrabber");
+static NS_NAMED_LITERAL_STRING(kNameISampleGrabberCB, "ISampleGrabberCB");
+static NS_NAMED_LITERAL_STRING(kNameClassSampleGrabber, "SampleGrabber");
+static NS_NAMED_LITERAL_STRING(kNameClassNullRenderer, "NullRenderer");
+
+/** Extract GUID with name nameGUID and assign it to guid */
+static void InitTypeLibGUID(
+    ITypeLib* const pTypeLib,
+    ITypeInfo** const typeInfoPtrArray,
+    MEMBERID* const memberIdArray,
+    const nsAString& nameGUID,
+    const TYPEKIND typeKindGUID,
+    GUID& guid) {
+  // Copy nameGUID as FindName requires a non const string
+  nsString copyNameGUID(nameGUID);
+  PRInt32 hashValue = 0;
+  PRUint16 countFound = 1;
+  HRESULT result = pTypeLib->FindName(
+      copyNameGUID.BeginWriting(),
+      hashValue,
+      typeInfoPtrArray,
+      memberIdArray,
+      &countFound);
+  if (result == S_OK) {
+    for (PRUint16 i = 0; i < countFound; ++i) {
+      ITypeInfo* pTypeInfo = typeInfoPtrArray[i];
+      typeInfoPtrArray[i] = 0;
+      TYPEATTR* pTypeAttribute = 0;
+      result = pTypeInfo->GetTypeAttr(&pTypeAttribute);
+      if (result == S_OK) {
+        if (pTypeAttribute->typekind == typeKindGUID) {
+          guid = pTypeAttribute->guid;
+#if DEBUG
+          printf(
+              "Found GUID: %s\n",
+              NS_LossyConvertUTF16toASCII(copyNameGUID).BeginReading());
+#endif
+        }
+        pTypeInfo->ReleaseTypeAttr(pTypeAttribute);
+      }
+      SAFE_RELEASE(pTypeInfo);
+    }
+  }
+}
+
+/** Extract IIDs and CLSIDs from qedit type library */
+static void InitAllQeditTypeLibGUIDs()
+{
+  ITypeLib* pQeditTypeLib = 0;
+  HRESULT result = LoadTypeLib(
+      kFilenameQeditTypeLib.BeginReading(),
+      &pQeditTypeLib);
+  if (result == S_OK) {
+    PRUint32 countTypeInfo = pQeditTypeLib->GetTypeInfoCount();
+    ITypeInfo** typeInfoPtrArray = new ITypeInfo*[countTypeInfo];
+    MEMBERID* memberIdArray = new MEMBERID[countTypeInfo];
+    InitTypeLibGUID(
+        pQeditTypeLib,
+        typeInfoPtrArray,
+        memberIdArray,
+        kNameISampleGrabber,
+        TKIND_INTERFACE,
+        IID_ISampleGrabber);
+    InitTypeLibGUID(
+        pQeditTypeLib,
+        typeInfoPtrArray,
+        memberIdArray,
+        kNameISampleGrabberCB,
+        TKIND_INTERFACE,
+        IID_ISampleGrabberCB);
+    InitTypeLibGUID(
+        pQeditTypeLib,
+        typeInfoPtrArray,
+        memberIdArray,
+        kNameClassSampleGrabber,
+        TKIND_COCLASS,
+        CLSID_SampleGrabber);
+    InitTypeLibGUID(
+        pQeditTypeLib,
+        typeInfoPtrArray,
+        memberIdArray,
+        kNameClassNullRenderer,
+        TKIND_COCLASS,
+        CLSID_NullRenderer);
+    delete[] memberIdArray;
+    delete[] typeInfoPtrArray;
+  }
+  SAFE_RELEASE(pQeditTypeLib);
+}
 
 /* Release the format block for a media type */
 static void
@@ -61,7 +158,7 @@ _DeleteMediaType(AM_MEDIA_TYPE *pmt)
 {
     if (pmt != NULL)
     {
-        _FreeMediaType(*pmt); 
+        _FreeMediaType(*pmt);
         CoTaskMemFree(pmt);
     }
 }
@@ -79,13 +176,13 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
     if (!ppSrcFilter) {
         return E_POINTER;
     }
-   
+
     hr = CoCreateInstance(
         CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC,
         IID_ICreateDevEnum, (void **)&pDevEnum
     );
     if (FAILED(hr)) return hr;
-    
+
     hr = pDevEnum->CreateClassEnumerator(
         CLSID_VideoInputDeviceCategory, &pClassEnum, 0
     );
@@ -93,7 +190,7 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
         SAFE_RELEASE(pDevEnum);
         return hr;
     }
-    
+
     if (pClassEnum == NULL) {
         /* No devices available */
         SAFE_RELEASE(pDevEnum);
@@ -110,7 +207,7 @@ GetDefaultInputDevice(IBaseFilter **ppSrcFilter)
         SAFE_RELEASE(pClassEnum);
         return E_FAIL;
     }
-    
+
     hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter, (void**)&pSrc);
     if (FAILED(hr)) {
         SAFE_RELEASE(pDevEnum);
@@ -135,11 +232,13 @@ VideoSourceWin::VideoSourceWin(int w, int h)
 {
     HRESULT hr;
     VIDEOINFOHEADER *pVid;
-    
+
     g2g = PR_FALSE;
 
     hr = CoInitialize(0);
     if (FAILED(hr)) return;
+
+    InitAllQeditTypeLibGUIDs();
 
     hr = CoCreateInstance(
         CLSID_FilterGraph, NULL, CLSCTX_INPROC,
@@ -182,7 +281,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
         pSrcFilter->Release();
         return;
     }
- 
+
     /* Create Null Renderer (required sink by ISampleGrabber) */
     hr = CoCreateInstance(
         CLSID_NullRenderer, NULL, CLSCTX_INPROC_SERVER,
@@ -192,7 +291,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
         pSrcFilter->Release();
         return;
     }
-    
+
     /* Get default media type values and set what we need */
     hr = pCapture->FindInterface(
         &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, pSrcFilter,
@@ -202,9 +301,9 @@ VideoSourceWin::VideoSourceWin(int w, int h)
         pSrcFilter->Release();
         return;
     }
-    
+
     hr = pConfig->GetFormat(&pMT);
-    
+
     /* If i420 is not available do RGB32 instead */
     if (pMT->subtype != MEDIASUBTYPE_I420) {
         pMT->subtype = MEDIASUBTYPE_ARGB32;
@@ -218,7 +317,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     pVid = reinterpret_cast<VIDEOINFOHEADER*>(pMT->pbFormat);
     pVid->bmiHeader.biWidth = width;
     pVid->bmiHeader.biHeight = height;
-    
+
     /* Set frame rates */
     fps_n = NANOSECONDS;
     fps_d = (PRUint32)pVid->AvgTimePerFrame;
@@ -226,7 +325,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     pConfig->SetFormat(pMT);
     pGrabber->SetMediaType(pMT);
     _DeleteMediaType(pMT);
-    
+
     /* Instance initialized properly */
     SAFE_RELEASE(pConfig);
     g2g = PR_TRUE;
@@ -248,15 +347,15 @@ nsresult
 VideoSourceWin::Start(nsIOutputStream *pipe)
 {
     HRESULT hr;
-    
+
     if (!g2g)
         return NS_ERROR_FAILURE;
-    
+
     /* Set our callback */
     pGrabber->SetBufferSamples(TRUE);
     cb = new VideoSourceWinCallback(pipe, width, height, doRGB);
     hr = pGrabber->SetCallback(cb, TYPE_BUFFERCB);
-    
+
     /* Add Sample Grabber to graph */
     hr = pGraph->AddFilter(pGrabberF, L"Sample Grabber");
     if (FAILED(hr)) {
@@ -337,12 +436,12 @@ VideoSourceWinCallback::QueryInterface(REFIID riid, void **ppvObject)
         *ppvObject = static_cast<IUnknown*>(this);
         return S_OK;
     }
-    
+
     if (riid == m_IID_ISampleGrabberCB) {
         *ppvObject = static_cast<ISampleGrabberCB*>(this);
         return S_OK;
     }
-    
+
     return E_NOTIMPL;
 }
 
@@ -360,11 +459,11 @@ VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
     PRUint8 tmp;
     PRUint8 *i420buf;
     int i, start, end, bpp, fsize, isize, off;
-    
+
     /* If camera didn't support i420, convert from RGB32 */
     if (doRGB) {
         bpp = 4;
-        
+
         /* Reverse top-down */
         for (start = 0, end = bufferLen - bpp; start < bufferLen / 2;
             start += bpp, end -= bpp) {
@@ -374,7 +473,7 @@ VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
                 pBuffer[end + off] = tmp;
             }
         }
-        
+
         /* Change to i420 */
         fsize = w * h * 4;
         isize = w * h * 3 / 2;
@@ -387,6 +486,6 @@ VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
     } else {
         rv = output->Write((const char *)pBuffer, bufferLen, &wr);
     }
-    
+
     return S_OK;
 }

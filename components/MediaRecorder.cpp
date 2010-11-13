@@ -69,7 +69,7 @@ public:
         nsAutoArrayPtr<PRUint8> &pData, PRUint32 pDataSize)
         :   m_pCtx(pCtx), m_width(width), m_height(height),
             m_pData(pData), m_pDataSize(pDataSize) {}
-    
+
     NS_IMETHOD Run() {
         return m_pCtx->PutImageData_explicit(
             0, 0, m_width, m_height, m_pData.get(), m_pDataSize
@@ -109,10 +109,10 @@ MediaRecorder::WriteAudio(void *data)
                 ret = ogg_stream_pageout(&mr->aState->os, &mr->aState->og);
                 if (ret == 0)
                     break;
-                
+
                 rv = mr->WriteData(
                     mr, mr->aState->og.header, mr->aState->og.header_len, &wr
-                );           
+                );
                 rv = mr->WriteData(
                     mr, mr->aState->og.body, mr->aState->og.body_len, &wr
                 );
@@ -154,7 +154,7 @@ MediaRecorder::WriteData(
 
             PR_Free(decoded);
             PR_Free(encoded);
-            return rv;     
+            return rv;
         }
         return NS_OK;
     }
@@ -264,7 +264,7 @@ MediaRecorder::Encode(void *data)
             PR_Free(v_frame);
             return;
         }
-        
+
         /* Write to canvas, if needed */
         if (mr->vState->vCanvas) {
             /* Convert RGB32 to i420 */
@@ -296,9 +296,9 @@ MediaRecorder::Encode(void *data)
         }
 
 audio_enc:
-    
+
         if (mr->a_rec) {
-             
+
         /* Make sure we get enough frames in unless we're at the end */
         a_frame = (PRUint8 *) PR_Calloc(a_frame_total, sizeof(PRUint8));
 
@@ -319,7 +319,7 @@ audio_enc:
             }
             return;
         }
-          
+
         /* Uninterleave samples. Alternatively, have portaudio do this? */
         a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_total);
         for (i = 0; i < a_frame_len; i++){
@@ -330,7 +330,7 @@ audio_enc:
                             32768.f;
             }
         }
-        
+
         /* Tell libvorbis to do its thing */
         vorbis_analysis_wrote(&mr->aState->vd, a_frame_len);
         MediaRecorder::WriteAudio(data);
@@ -359,7 +359,7 @@ MediaRecorder::Init()
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
-    return NS_OK;   
+    return NS_OK;
 }
 
 MediaRecorder::~MediaRecorder()
@@ -386,7 +386,7 @@ MediaRecorder::SetupTheoraBOS()
         PR_LOG(log, PR_LOG_NOTICE, ("Failed ogg_stream_init\n"));
         return NS_ERROR_FAILURE;
     }
-    
+
     th_info_init(&vState->ti);
 
     /* Must be multiples of 16 */
@@ -410,7 +410,7 @@ MediaRecorder::SetupTheoraBOS()
 
     vState->th = th_encode_alloc(&vState->ti);
     th_info_clear(&vState->ti);
-    
+
     /* Header init */
     th_comment_init(&vState->tc);
     th_comment_add_tag(&vState->tc, (char *)"ENCODER", (char *)"rainbow");
@@ -420,13 +420,13 @@ MediaRecorder::SetupTheoraBOS()
         return NS_ERROR_FAILURE;
     }
     th_comment_clear(&vState->tc);
-    
+
     ogg_stream_packetin(&vState->os, &vState->op);
     if (ogg_stream_pageout(&vState->os, &vState->og) != 1) {
         PR_LOG(log, PR_LOG_NOTICE, ("Internal Ogg library error\n"));
         return NS_ERROR_FAILURE;
     }
-    
+
     rv = WriteData(
         this, vState->og.header, vState->og.header_len, &wr
     );
@@ -500,17 +500,17 @@ MediaRecorder::SetupVorbisBOS()
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vorbis_encode_init\n"));
         return NS_ERROR_FAILURE;
     }
-    
+
     vorbis_comment_init(&aState->vc);
     vorbis_comment_add_tag(&aState->vc, "ENCODER", "rainbow");
     vorbis_analysis_init(&aState->vd, &aState->vi);
     vorbis_block_init(&aState->vd, &aState->vb);
-    
+
     {
         ogg_packet header;
         ogg_packet header_comm;
         ogg_packet header_code;
-        
+
         vorbis_analysis_headerout(
             &aState->vd, &aState->vc,
             &header, &header_comm, &header_code
@@ -523,7 +523,7 @@ MediaRecorder::SetupVorbisBOS()
             PR_LOG(log, PR_LOG_NOTICE, ("Internal Ogg library error\n"));
             return NS_ERROR_FAILURE;
         }
-        
+
         rv = WriteData(
             this, aState->og.header, aState->og.header_len, &wr
         );
@@ -599,7 +599,7 @@ MediaRecorder::RecordToFile(
     nsCOMPtr<nsIFileOutputStream> stream(
         do_CreateInstance("@mozilla.org/network/file-output-stream;1")
     );
-    
+
     pipeFile = do_QueryInterface(stream, &rv);
     if (NS_FAILED(rv)) return rv;
     rv = stream->Init(file, -1, -1, 0);
@@ -618,7 +618,7 @@ MediaRecorder::RecordToSocket(
     nsIWebSocket *sock
 )
 {
-    pipeSock = sock;    
+    pipeSock = sock;
     ParseProperties(prop);
     MakePipe(getter_AddRefs(sockIn), getter_AddRefs(sockOut));
 
@@ -634,7 +634,7 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
     nsresult rv;
 
     rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("audio"), &params->audio);
-    if (NS_FAILED(rv)) params->audio = PR_TRUE; 
+    if (NS_FAILED(rv)) params->audio = PR_TRUE;
     rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("video"), &params->video);
     if (NS_FAILED(rv)) params->video = PR_TRUE;
     rv = prop->GetPropertyAsUint32(NS_LITERAL_STRING("width"), &params->width);
@@ -655,7 +655,7 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
 nsresult
 MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
 {
-    nsresult rv; 
+    nsresult rv;
     if (a_rec || v_rec) {
         PR_LOG(log, PR_LOG_NOTICE, ("Recording in progress\n"));
         return NS_ERROR_FAILURE;
@@ -750,14 +750,14 @@ MediaRecorder::Stop()
 
     if (!a_rec && !v_rec) {
         PR_LOG(log, PR_LOG_NOTICE, ("No recording in progress\n"));
-        return NS_ERROR_FAILURE;    
+        return NS_ERROR_FAILURE;
     }
 
     if (v_rec) {
         rv = vState->backend->Stop();
         if (NS_FAILED(rv)) return rv;
     }
-    
+
     if (a_rec) {
         rv = aState->backend->Stop();
         if (NS_FAILED(rv)) return rv;
@@ -774,7 +774,7 @@ MediaRecorder::Stop()
     }
 
     PR_JoinThread(encoder);
-    
+
     if (v_rec) {
         vState->vPipeIn->Close();
         th_encode_free(vState->th);
@@ -792,10 +792,10 @@ MediaRecorder::Stop()
         ogg_stream_clear(&vState->os);
         v_rec = PR_FALSE;
     }
-    
+
     if (a_rec) {
         aState->aPipeIn->Close();
-    
+
         /* Audio trailer */
         vorbis_analysis_wrote(&aState->vd, 0);
         MediaRecorder::WriteAudio(this);
@@ -807,7 +807,7 @@ MediaRecorder::Stop()
         ogg_stream_clear(&aState->os);
         a_rec = PR_FALSE;
     }
- 
+
     /* GG */
     if (pipeFile) {
         pipeFile->Close();
