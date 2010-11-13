@@ -94,7 +94,7 @@ ifeq ($(os), Darwin)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
   headers += -I../lib/Darwin_i386-gcc3/include
-  
+
   ifeq ($(debug),1)
     cppflags += -g -DDEBUG
   endif
@@ -156,14 +156,14 @@ ifeq ($(os), WINNT)
     ../lib/WINNT_x86-msvc/libvorbis.lib \
     ../lib/WINNT_x86-msvc/libtheora.lib \
     ../lib/WINNT_x86-msvc/portaudio.lib \
-    strmiids.lib comsuppw.lib ole32.lib user32.lib advapi32.lib $(ldops)
+    strmiids.lib comsuppw.lib ole32.lib oleaut32.lib user32.lib advapi32.lib $(ldops)
 rcflags := -r $(headers)
 else
 ifeq ($(os), Linux)
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
   headers += -I../lib/Linux_x86-gcc3/include
-  
+
   ifeq ($(debug),1)
     cppflags += -g -DDEBUG
   endif
@@ -175,7 +175,7 @@ ifeq ($(os), Linux)
     -Wpointer-arith -Woverloaded-virtual -Wsynth \
     -Wno-ctor-dtor-privacy -Wno-non-virtual-dtor -Wcast-align \
     -Wno-long-long -include xpcom-config.h $(headers)
- 
+
   ldflags += -pthread -pipe -m32 \
     -Wl,-z,defs \
     -Wl,-rpath-link,$(sdkdir)/bin \
@@ -199,7 +199,7 @@ all: build
 
 build: $(so_target) $(idl_typelib)
 
-clean: 
+clean:
 	rm -f $(so_target) $(cpp_objects) \
   $(idl_typelib) $(idl_headers) \
 	$(target:=.res) fake.lib fake.exp $(target).pdb $(target).ilk
