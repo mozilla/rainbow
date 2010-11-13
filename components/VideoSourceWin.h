@@ -59,9 +59,6 @@ interface ISampleGrabberCB : public IUnknown
     virtual STDMETHODIMP BufferCB( double SampleTime, BYTE *pBuffer, long BufferLen ) = 0;
 };
 
-static const
-IID IID_ISampleGrabberCB = { 0x0579154A, 0x2B53, 0x4994, { 0xB0, 0xD0, 0xE7, 0x73, 0x14, 0x8E, 0xFF, 0x85 } };
-
 interface ISampleGrabber : public IUnknown
 {
     virtual HRESULT STDMETHODCALLTYPE SetOneShot( BOOL OneShot ) = 0;
@@ -73,12 +70,10 @@ interface ISampleGrabber : public IUnknown
     virtual HRESULT STDMETHODCALLTYPE SetCallback( ISampleGrabberCB *pCallback, long WhichMethodToCallback ) = 0;
 };
 
-static const
-IID IID_ISampleGrabber = { 0x6B652FFF, 0x11FE, 0x4fce, { 0x92, 0xAD, 0x02, 0x66, 0xB5, 0xD7, 0xC7, 0x8F } };
-static const
-CLSID CLSID_SampleGrabber = { 0xC1F400A0, 0x3F08, 0x11d3, { 0x9F, 0x0B, 0x00, 0x60, 0x08, 0x03, 0x9E, 0x37 } };
-static const
-CLSID CLSID_NullRenderer = { 0xC1F400A4, 0x3F08, 0x11d3, { 0x9F, 0x0B, 0x00, 0x60, 0x08, 0x03, 0x9E, 0x37 } };
+extern IID IID_ISampleGrabber;
+extern IID IID_ISampleGrabberCB;
+extern CLSID CLSID_SampleGrabber;
+extern CLSID CLSID_NullRenderer;
 static const
 GUID MEDIASUBTYPE_I420 = { 0x30323449, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
 
@@ -120,7 +115,7 @@ protected:
     IMediaControl *pMC;
     IGraphBuilder *pGraph;
     ICaptureGraphBuilder2 *pCapture;
-    
+
     IBaseFilter *pNullF;
     IBaseFilter *pGrabberF;
     IBaseFilter *pSrcFilter;
@@ -128,7 +123,7 @@ protected:
 
     AM_MEDIA_TYPE *pMT;
     IAMStreamConfig *pConfig;
-    
+
     VideoSourceWinCallback *cb;
 
 };
