@@ -57,35 +57,6 @@ MediaRecorder::GetSingleton()
 }
 
 
-/* Rendering on Canvas happens on the main thread as this runnable.
- * This is not very performant, we should move to rendering inside a <video>
- * so that Gecko can use hardware acceleration.
- */
-class CanvasRenderer : public nsRunnable
-{
-public:
-    CanvasRenderer(
-        nsIDOMCanvasRenderingContext2D *pCtx, PRUint32 width, PRUint32 height,
-        nsAutoArrayPtr<PRUint8> &pData, PRUint32 pDataSize)
-        :   m_pCtx(pCtx), m_width(width), m_height(height),
-            m_pData(pData), m_pDataSize(pDataSize) {}
-
-    NS_IMETHOD Run() {
-        return m_pCtx->PutImageData_explicit(
-            0, 0, m_width, m_height, m_pData.get(), m_pDataSize
-        );
-    }
-
-private:
-    nsIDOMCanvasRenderingContext2D *m_pCtx;
-    PRUint32 m_width;
-    PRUint32 m_height;
-    nsAutoArrayPtr<PRUint8> m_pData;
-    PRUint32 m_pDataSize;
-
-};
-
-
 /*
  * === Here's the meat of the code. Static callbacks & encoder ===
  */
@@ -263,23 +234,6 @@ MediaRecorder::Encode(void *data)
             PR_LOG(mr->log, PR_LOG_NOTICE, ("Could not read packet\n"));
             PR_Free(v_frame);
             return;
-        }
-
-        /* Write to canvas, if needed */
-        if (mr->vState->vCanvas) {
-            /* Convert RGB32 to i420 */
-            nsAutoArrayPtr<PRUint8> rgb32(
-                new PRUint8[mr->params->width * mr->params->height * 4]
-            );
-            I420toRGB32(mr->params->width, mr->params->height,
-                (const char *)v_frame, (char *)rgb32.get());
-
-            nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
-                mr->vState->vCanvas,
-                mr->params->width, mr->params->height,
-                rgb32, mr->params->width * mr->params->height * 4
-            );
-            rv = NS_DispatchToMainThread(render);
         }
 
         ogg_stream_packetin(&mr->vState->os, &mr->vState->op);
@@ -690,9 +644,6 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
 
     /* Get ready for video! */
     if (params->video) {
-        if (ctx) {
-            vState->vCanvas = ctx;
-        }
         SetupTheoraBOS();
         rv = MakePipe(
             getter_AddRefs(vState->vPipeIn),
@@ -714,7 +665,7 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
     /* Let's DO this. */
     if (params->video) {
         SetupTheoraHeaders();
-        rv = vState->backend->Start(vState->vPipeOut);
+        rv = vState->backend->Start(vState->vPipeOut, ctx);
         if (NS_FAILED(rv)) return rv;
         v_rec = PR_TRUE;
         v_stp = PR_FALSE;

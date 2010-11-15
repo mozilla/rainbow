@@ -118,11 +118,13 @@ VideoSourceMac::~VideoSourceMac()
 }
 
 nsresult
-VideoSourceMac::Start(nsIOutputStream *pipe)
+VideoSourceMac::Start(
+    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
 {
     if (!g2g)
         return NS_ERROR_FAILURE;
 
+    vCanvas = ctx;
     if (!(source = vidcap_src_acquire(sapi, &sources[0]))) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_acquire\n"));
         return NS_ERROR_FAILURE;
@@ -165,9 +167,25 @@ VideoSourceMac::Callback(
     PRUint32 wr;
     VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
 
+    /* Write to pipe */
     rv = vsm->output->Write(
         (const char *)video->video_data, video->video_data_size, &wr
     );
+
+    /* Write to canvas, if needed */
+    int fsize = vsm->width * vsm->height * 4;
+    if (vsm->vCanvas) {
+        /* Convert RGB32 to i420 */
+        nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[fsize]);
+        I420toRGB32(vsm->width, vsm->height,
+            (const char *)video->video_data, (char *)rgb32.get());
+
+        nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
+            vsm->vCanvas, vsm->width, vsm->height, rgb32, fsize
+        );
+        rv = NS_DispatchToMainThread(render);
+    }
+
     return 0;
 }
 

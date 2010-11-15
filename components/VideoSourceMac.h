@@ -51,7 +51,7 @@ public:
     ~VideoSourceMac();
 
     nsresult Stop();
-    nsresult Start(nsIOutputStream *pipe);
+    nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
 
 protected:
     vidcap_sapi *sapi;
@@ -60,6 +60,7 @@ protected:
     nsIOutputStream *output;
     struct vidcap_src_info *sources;
     struct vidcap_fmt_info fmt_info;
+    nsIDOMCanvasRenderingContext2D *vCanvas;
 
     static int Callback(
         vidcap_src *src, void *data, struct vidcap_capture_info *video

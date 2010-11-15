@@ -38,7 +38,6 @@
 #ifndef MediaRecorder_h_
 #define MediaRecorder_h_
 
-#include "Convert.h"
 #include "IMediaRecorder.h"
 
 #include <ogg/ogg.h>
@@ -52,10 +51,8 @@
 #include <nsCOMPtr.h>
 #include <nsAutoPtr.h>
 #include <nsStringAPI.h>
-#include <nsThreadUtils.h>
 
 #include <nsIPipe.h>
-#include <nsIRunnable.h>
 #include <nsIFileStreams.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
