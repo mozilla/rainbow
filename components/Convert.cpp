@@ -141,30 +141,30 @@ RGB32toI420(int width, int height, const char *src, char *dst)
     for (i = 0; i < height / 2; ++i) {
         for (j = 0; j < width / 2; ++j) {
             short r, g, b;
-            b = *src_even++;
-            g = *src_even++;
             r = *src_even++;
+            g = *src_even++;
+            b = *src_even++;
             ++src_even;
             *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
 
             *dst_u++ = (( r * -38 - g * 74 + b * 112 + 128 ) >> 8 ) + 128;
             *dst_v++ = (( r * 112 - g * 94 - b * 18 + 128 ) >> 8 ) + 128;
 
-            b = *src_even++;
-            g = *src_even++;
             r = *src_even++;
+            g = *src_even++;
+            b = *src_even++;
             ++src_even;
             *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
 
-            b = *src_odd++;
-            g = *src_odd++;
             r = *src_odd++;
+            g = *src_odd++;
+            b = *src_odd++;
             ++src_odd;
             *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
 
-            b = *src_odd++;
-            g = *src_odd++;
             r = *src_odd++;
+            g = *src_odd++;
+            b = *src_odd++;
             ++src_odd;
             *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
         }

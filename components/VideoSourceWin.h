@@ -74,8 +74,6 @@ extern IID IID_ISampleGrabber;
 extern IID IID_ISampleGrabberCB;
 extern CLSID CLSID_SampleGrabber;
 extern CLSID CLSID_NullRenderer;
-static const
-GUID MEDIASUBTYPE_I420 = { 0x30323449, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
 
 #define SAFE_RELEASE(x) { if (x) x->Release(); x = NULL; }
 /* End qedit.h */
@@ -83,7 +81,9 @@ GUID MEDIASUBTYPE_I420 = { 0x30323449, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA,
 class VideoSourceWinCallback : public ISampleGrabberCB
 {
 public:
-    VideoSourceWinCallback(nsIOutputStream *pipe, int w, int h, PRBool rgb);
+    VideoSourceWinCallback(
+        nsIOutputStream *pipe, int w, int h, nsIDOMCanvasRenderingContext2D *ctx
+    );
 
     STDMETHODIMP_(ULONG) AddRef();
     STDMETHODIMP_(ULONG) Release();
@@ -94,9 +94,11 @@ public:
 private:
     int w;
     int h;
-    PRBool doRGB;
     int m_refCount;
+    
     nsIOutputStream *output;
+    nsIDOMCanvasRenderingContext2D *vCanvas;
+    
     IID m_IID_ISampleGrabberCB;
 
 };
@@ -108,10 +110,9 @@ public:
     ~VideoSourceWin();
 
     nsresult Stop();
-    nsresult Start(nsIOutputStream *pipe);
+    nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
 
 protected:
-    PRBool doRGB;
     IMediaControl *pMC;
     IGraphBuilder *pGraph;
     ICaptureGraphBuilder2 *pCapture;

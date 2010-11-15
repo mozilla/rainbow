@@ -49,89 +49,77 @@ static NS_NAMED_LITERAL_STRING(kNameISampleGrabberCB, "ISampleGrabberCB");
 static NS_NAMED_LITERAL_STRING(kNameClassSampleGrabber, "SampleGrabber");
 static NS_NAMED_LITERAL_STRING(kNameClassNullRenderer, "NullRenderer");
 
-/** Extract GUID with name nameGUID and assign it to guid */
-static void InitTypeLibGUID(
-    ITypeLib* const pTypeLib,
-    ITypeInfo** const typeInfoPtrArray,
-    MEMBERID* const memberIdArray,
-    const nsAString& nameGUID,
-    const TYPEKIND typeKindGUID,
-    GUID& guid) {
-  // Copy nameGUID as FindName requires a non const string
-  nsString copyNameGUID(nameGUID);
-  PRInt32 hashValue = 0;
-  PRUint16 countFound = 1;
-  HRESULT result = pTypeLib->FindName(
-      copyNameGUID.BeginWriting(),
-      hashValue,
-      typeInfoPtrArray,
-      memberIdArray,
-      &countFound);
-  if (result == S_OK) {
-    for (PRUint16 i = 0; i < countFound; ++i) {
-      ITypeInfo* pTypeInfo = typeInfoPtrArray[i];
-      typeInfoPtrArray[i] = 0;
-      TYPEATTR* pTypeAttribute = 0;
-      result = pTypeInfo->GetTypeAttr(&pTypeAttribute);
-      if (result == S_OK) {
-        if (pTypeAttribute->typekind == typeKindGUID) {
-          guid = pTypeAttribute->guid;
-#if DEBUG
-          printf(
-              "Found GUID: %s\n",
-              NS_LossyConvertUTF16toASCII(copyNameGUID).BeginReading());
-#endif
+/* Extract GUID with name nameGUID and assign it to guid */
+static void
+InitTypeLibGUID(
+    ITypeLib* const pTypeLib, ITypeInfo** const typeInfoPtrArray,
+    MEMBERID* const memberIdArray, const nsAString& nameGUID,
+    const TYPEKIND typeKindGUID, GUID& guid) {
+    
+    // Copy nameGUID as FindName requires a non const string
+    nsString copyNameGUID(nameGUID);
+    PRInt32 hashValue = 0;
+    PRUint16 countFound = 1;
+    HRESULT result = pTypeLib->FindName(
+        copyNameGUID.BeginWriting(), hashValue, typeInfoPtrArray, 
+        memberIdArray, &countFound
+    );
+    
+    if (result == S_OK) {
+        for (PRUint16 i = 0; i < countFound; ++i) {
+            ITypeInfo* pTypeInfo = typeInfoPtrArray[i];
+            typeInfoPtrArray[i] = 0;
+            TYPEATTR* pTypeAttribute = 0;
+            
+            result = pTypeInfo->GetTypeAttr(&pTypeAttribute);
+            if (result == S_OK) {
+                if (pTypeAttribute->typekind == typeKindGUID) {
+                    guid = pTypeAttribute->guid;
+                }
+                pTypeInfo->ReleaseTypeAttr(pTypeAttribute);
+            }
+        
+            SAFE_RELEASE(pTypeInfo);
         }
-        pTypeInfo->ReleaseTypeAttr(pTypeAttribute);
-      }
-      SAFE_RELEASE(pTypeInfo);
     }
-  }
 }
 
-/** Extract IIDs and CLSIDs from qedit type library */
-static void InitAllQeditTypeLibGUIDs()
+/* Extract IIDs and CLSIDs from qedit type library */
+static void
+InitAllQeditTypeLibGUIDs()
 {
-  ITypeLib* pQeditTypeLib = 0;
-  HRESULT result = LoadTypeLib(
-      kFilenameQeditTypeLib.BeginReading(),
-      &pQeditTypeLib);
-  if (result == S_OK) {
-    PRUint32 countTypeInfo = pQeditTypeLib->GetTypeInfoCount();
-    ITypeInfo** typeInfoPtrArray = new ITypeInfo*[countTypeInfo];
-    MEMBERID* memberIdArray = new MEMBERID[countTypeInfo];
-    InitTypeLibGUID(
-        pQeditTypeLib,
-        typeInfoPtrArray,
-        memberIdArray,
-        kNameISampleGrabber,
-        TKIND_INTERFACE,
-        IID_ISampleGrabber);
-    InitTypeLibGUID(
-        pQeditTypeLib,
-        typeInfoPtrArray,
-        memberIdArray,
-        kNameISampleGrabberCB,
-        TKIND_INTERFACE,
-        IID_ISampleGrabberCB);
-    InitTypeLibGUID(
-        pQeditTypeLib,
-        typeInfoPtrArray,
-        memberIdArray,
-        kNameClassSampleGrabber,
-        TKIND_COCLASS,
-        CLSID_SampleGrabber);
-    InitTypeLibGUID(
-        pQeditTypeLib,
-        typeInfoPtrArray,
-        memberIdArray,
-        kNameClassNullRenderer,
-        TKIND_COCLASS,
-        CLSID_NullRenderer);
-    delete[] memberIdArray;
-    delete[] typeInfoPtrArray;
-  }
-  SAFE_RELEASE(pQeditTypeLib);
+    ITypeLib* pQeditTypeLib = 0;
+    HRESULT result = LoadTypeLib(
+        kFilenameQeditTypeLib.BeginReading(), &pQeditTypeLib
+    );
+    
+    if (result == S_OK) {
+        PRUint32 countTypeInfo = pQeditTypeLib->GetTypeInfoCount();
+        ITypeInfo** typeInfoPtrArray = new ITypeInfo*[countTypeInfo];
+        MEMBERID* memberIdArray = new MEMBERID[countTypeInfo];
+        
+        InitTypeLibGUID(
+            pQeditTypeLib, typeInfoPtrArray, memberIdArray,
+            kNameISampleGrabber, TKIND_INTERFACE, IID_ISampleGrabber
+        );
+        InitTypeLibGUID(
+            pQeditTypeLib, typeInfoPtrArray, memberIdArray,
+            kNameISampleGrabberCB, TKIND_INTERFACE, IID_ISampleGrabberCB
+        );
+        InitTypeLibGUID(
+            pQeditTypeLib, typeInfoPtrArray, memberIdArray,
+            kNameClassSampleGrabber, TKIND_COCLASS, CLSID_SampleGrabber
+        );
+        InitTypeLibGUID(
+            pQeditTypeLib, typeInfoPtrArray, memberIdArray,
+            kNameClassNullRenderer, TKIND_COCLASS, CLSID_NullRenderer
+        );
+        
+        delete[] memberIdArray;
+        delete[] typeInfoPtrArray;
+    }
+    
+    SAFE_RELEASE(pQeditTypeLib);
 }
 
 /* Release the format block for a media type */
@@ -304,16 +292,12 @@ VideoSourceWin::VideoSourceWin(int w, int h)
 
     hr = pConfig->GetFormat(&pMT);
 
-    /* If i420 is not available do RGB32 instead */
-    if (pMT->subtype != MEDIASUBTYPE_I420) {
-        pMT->subtype = MEDIASUBTYPE_ARGB32;
-        doRGB = PR_TRUE;
-    } else {
-        pVid->bmiHeader.biCompression = 'VUYI';
-        doRGB = PR_FALSE;
-    }
+    /* We play it safe and request RGB32 always because that's what majority
+     * of webcams seem to support
+     */
     pMT->majortype = MEDIATYPE_Video;
     pMT->formattype = FORMAT_VideoInfo;
+    pMT->subtype = MEDIASUBTYPE_ARGB32;
     pVid = reinterpret_cast<VIDEOINFOHEADER*>(pMT->pbFormat);
     pVid->bmiHeader.biWidth = width;
     pVid->bmiHeader.biHeight = height;
@@ -344,7 +328,8 @@ VideoSourceWin::~VideoSourceWin()
 }
 
 nsresult
-VideoSourceWin::Start(nsIOutputStream *pipe)
+VideoSourceWin::Start(
+    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
 {
     HRESULT hr;
 
@@ -353,8 +338,8 @@ VideoSourceWin::Start(nsIOutputStream *pipe)
 
     /* Set our callback */
     pGrabber->SetBufferSamples(TRUE);
-    cb = new VideoSourceWinCallback(pipe, width, height, doRGB);
-    hr = pGrabber->SetCallback(cb, TYPE_BUFFERCB);
+    cb = new VideoSourceWinCallback(pipe, width, height, ctx);
+    hr = pGrabber->SetCallback(cb, TYPE_SAMPLECB);
 
     /* Add Sample Grabber to graph */
     hr = pGraph->AddFilter(pGrabberF, L"Sample Grabber");
@@ -401,12 +386,13 @@ VideoSourceWin::Stop()
 
 /* Callback class */
 VideoSourceWinCallback::VideoSourceWinCallback(
-    nsIOutputStream *pipe, int width, int height, PRBool rgb)
+    nsIOutputStream *pipe, int width, int height,
+    nsIDOMCanvasRenderingContext2D *ctx)
 {
     w = width;
     h = height;
-    doRGB = rgb;
     output = pipe;
+    vCanvas = ctx;
     m_refCount = 0;
 }
 
@@ -448,44 +434,68 @@ VideoSourceWinCallback::QueryInterface(REFIID riid, void **ppvObject)
 STDMETHODIMP
 VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
 {
-    return E_NOTIMPL;
+    HRESULT hr;
+    nsresult rv;
+    
+    PRUint32 wr;
+    BYTE *pBuffer;
+    long bufferLen;
+    PRUint8 *i420buf;
+    int start, end, fsize, isize, bpp;
+    
+    bpp = 4;
+    fsize = w * h * 4;
+    isize = w * h * 3 / 2;
+    bufferLen = pSample->GetActualDataLength();
+    
+    hr = pSample->GetPointer(&pBuffer);
+    nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[bufferLen]);
+    memcpy(rgb32.get(), pBuffer, bufferLen);
+    pBuffer = rgb32.get();
+    
+    /* Reverse RGB32 top-down */
+    PRUint8 tmp;
+    for (start = 0, end = bufferLen - bpp;
+            start < bufferLen / 2;
+            start += bpp, end -= bpp) {
+
+        /* While we're here let's do a RGB<->BGR swap */
+        tmp = pBuffer[start];
+        pBuffer[start] = pBuffer[end+2];
+        pBuffer[end+2] = tmp;
+        
+        tmp = pBuffer[start+1];
+        pBuffer[start+1] = pBuffer[end+1];
+        pBuffer[end+1] = tmp;
+        
+        tmp = pBuffer[start+2];
+        pBuffer[start+2] = pBuffer[end];
+        pBuffer[end] = tmp;
+        
+        tmp = pBuffer[start+3];
+        pBuffer[start+3] = pBuffer[end+3];
+        pBuffer[end+3] = tmp;
+    }
+    
+    /* Write sample to canvas if neccessary */
+    if (vCanvas) {
+        nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
+            vCanvas, w, h, rgb32, fsize
+        );
+        rv = NS_DispatchToMainThread(render);
+    }
+    
+    /* Write to pipe after converting to i420 */
+    i420buf = (PRUint8 *)PR_Calloc(isize, sizeof(PRUint8));
+    RGB32toI420(w, h, (const char *)pBuffer, (char *)i420buf);
+    rv = output->Write((const char *)i420buf, isize, &wr);
+    PR_Free(i420buf);
+    
+    return S_OK;
 }
 
 STDMETHODIMP
 VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
 {
-    nsresult rv;
-    PRUint32 wr;
-    PRUint8 tmp;
-    PRUint8 *i420buf;
-    int i, start, end, bpp, fsize, isize, off;
-
-    /* If camera didn't support i420, convert from RGB32 */
-    if (doRGB) {
-        bpp = 4;
-
-        /* Reverse top-down */
-        for (start = 0, end = bufferLen - bpp; start < bufferLen / 2;
-            start += bpp, end -= bpp) {
-            for (off = 0; off < bpp; off += 1) {
-                tmp = pBuffer[start + off];
-                pBuffer[start + off] = pBuffer[end + off];
-                pBuffer[end + off] = tmp;
-            }
-        }
-
-        /* Change to i420 */
-        fsize = w * h * 4;
-        isize = w * h * 3 / 2;
-        for (i = 0; i < bufferLen / fsize; i++) {
-            i420buf = (PRUint8 *)PR_Calloc(isize, sizeof(PRUint8));
-            RGB32toI420(w, h, (const char *)pBuffer + i * fsize, (char *)i420buf);
-            rv = output->Write((const char *)i420buf, isize, &wr);
-            PR_Free(i420buf);
-        }
-    } else {
-        rv = output->Write((const char *)pBuffer, bufferLen, &wr);
-    }
-
-    return S_OK;
+    return E_NOTIMPL;
 }
