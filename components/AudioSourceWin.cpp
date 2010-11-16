@@ -114,68 +114,56 @@ AudioSourceWin::Stop()
     while (pending != 0) Sleep(100);
     
     /* Clean up headers */
-    waveInPrepareHeader(handle, &buffer[1], sizeof(WAVEHDR));
-    waveInPrepareHeader(handle, &buffer[0], sizeof(WAVEHDR));
-    waveInClose(handle);
-    
     for (int i = 0; i < NUM_BUFFERS; i++) {
+        waveInPrepareHeader(handle, &buffer[i], sizeof(WAVEHDR));
         if (buffer[i].lpData)
             VirtualFree(buffer[i].lpData, 0, MEM_RELEASE);
     }
 
+    waveInClose(handle);
     return NS_OK;
 }
 
 DWORD WINAPI
 AudioSourceWin::Callback(void *data)
 {
-	MSG msg;
+    MSG msg;
     nsresult rv;
     PRUint32 wr;
     AudioSourceWin *asw = static_cast<AudioSourceWin*>(data);
     
-	/* This MSG comes from the audio driver */
-	while (GetMessage(&msg, 0, 0, 0) == 1) {
-		
-		switch (msg.message) {
-			
-			case MM_WIM_DATA: 
-			{
+    /* This MSG comes from the audio driver */
+    while (GetMessage(&msg, 0, 0, 0) == 1) {
+        switch (msg.message) {
+            case MM_WIM_DATA:
                 /* A buffer has been filled by the driver */
-				if (((WAVEHDR *)msg.lParam)->dwBytesRecorded) {
+                if (((WAVEHDR *)msg.lParam)->dwBytesRecorded) {
                     /* Write samples to pipe */
                     rv = asw->output->Write(
                         (const char *)((WAVEHDR *)msg.lParam)->lpData,
                         ((WAVEHDR *)msg.lParam)->dwBytesRecorded, &wr
                     );
-				}
+                }
 
-				if (asw->rec) {
+                if (asw->rec) {
                     /* If we're still recording, send back this buffer */
-					waveInAddBuffer(
+                    waveInAddBuffer(
                         asw->handle, (WAVEHDR *)msg.lParam, sizeof(WAVEHDR)
                     );
-				} else {
+                } else {
                     asw->pending -= 1;
                 }
                 continue;
-			}
-
-			case MM_WIM_OPEN:
-			{
+            case MM_WIM_OPEN:
                 /* Set pending number of buffers */
                 asw->pending = NUM_BUFFERS;
                 continue;
-			}
+            case MM_WIM_CLOSE:
+                /* We're done recording */
+                break;
+        }
+    }
 
-			case MM_WIM_CLOSE:
-			{
-				/* We're done recording */
-				break;
-			}
-            
-		}
-	}
-
-	return 0;
+    return 0;
 }
+
