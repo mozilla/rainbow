@@ -55,8 +55,8 @@ so_target = $(target:=.$(so))
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
-    VideoSource.cpp VideoSource$(teh).cpp \
-    AudioSource.cpp AudioSource$(teh).cpp
+    VideoSource.cpp $(os)/VideoSource$(teh).cpp \
+    AudioSource.cpp $(os)/AudioSource$(teh).cpp
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
@@ -76,7 +76,7 @@ cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
 cppflags = -DRAINBOW_$(teh)
-headers = -I. -I$(sdkdir)/include \
+headers = -I. -I$(os) -I$(sdkdir)/include \
     -I$(sdkdir)/include/system_wrappers \
     -I$(sdkdir)/include/xpcom \
     -I$(sdkdir)/include/string \
