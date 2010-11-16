@@ -180,9 +180,8 @@ ifeq ($(os), Linux)
     -Wl,-z,defs \
     -Wl,-rpath-link,$(sdkdir)/bin \
     $(sdkdir)/lib/libxpcomglue_s.a \
-    $(libdirs) $(libs) -lrt \
+    $(libdirs) $(libs) -lrt -lasound \
     ../lib/Linux_x86-gcc3/libvidcap.a \
-    ../lib/Linux_x86-gcc3/libportaudio.a \
     ../lib/Linux_x86-gcc3/libvorbis.a \
     ../lib/Linux_x86-gcc3/libvorbisenc.a \
     ../lib/Linux_x86-gcc3/libogg.a \

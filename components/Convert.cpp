@@ -144,29 +144,35 @@ RGB32toI420(int width, int height, const char *src, char *dst)
             r = *src_even++;
             g = *src_even++;
             b = *src_even++;
-            ++src_even;
-            *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
 
-            *dst_u++ = (( r * -38 - g * 74 + b * 112 + 128 ) >> 8 ) + 128;
-            *dst_v++ = (( r * 112 - g * 94 - b * 18 + 128 ) >> 8 ) + 128;
+            ++src_even;
+            *dst_y_even++ = (unsigned char)
+                ((( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16);
+            *dst_u++ = (unsigned char)
+                ((( r * -38 - g * 74 + b * 112 + 128 ) >> 8 ) + 128);
+            *dst_v++ = (unsigned char)
+                ((( r * 112 - g * 94 - b * 18 + 128 ) >> 8 ) + 128);
 
             r = *src_even++;
             g = *src_even++;
             b = *src_even++;
             ++src_even;
-            *dst_y_even++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+            *dst_y_even++ = (unsigned char)
+                ((( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16);
 
             r = *src_odd++;
             g = *src_odd++;
             b = *src_odd++;
             ++src_odd;
-            *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+            *dst_y_odd++ = (unsigned char)
+                ((( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16);
 
             r = *src_odd++;
             g = *src_odd++;
             b = *src_odd++;
             ++src_odd;
-            *dst_y_odd++ = (( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16;
+            *dst_y_odd++ = (unsigned char)
+                ((( r * 66 + g * 129 + b * 25 + 128 ) >> 8 ) + 16);
         }
 
         dst_y_odd += width;

@@ -51,3 +51,15 @@ AudioSource::GetFrameSize()
     return sizeof(SAMPLE) * channels;
 }
 
+PRUint32
+AudioSource::GetRate()
+{
+    return (PRUint32)rate;
+}
+
+PRUint32
+AudioSource::GetChannels()
+{
+    return (PRUint32)channels;
+}
+

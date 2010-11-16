@@ -35,41 +35,35 @@
  * ***** END LICENSE BLOCK ***** */
 
 /*
- * Interface for video sources to implement. Not really neccessary because we
- * use only portaudio for all platforms, but just in case we switch to something
- * else in the future.
- * TODO: Figure out if and how to do device selection
+ * Video source implementation for Linux.
+ * We're using libvidcap but we should switch to V4L2 direct!
  */
-#include <prlog.h>
-#include <nsError.h>
-#include <nsIOutputStream.h>
+#include "VideoSource.h"
 
-/* Defaults */
-#define NUM_CHANNELS    1
-#define FRAMES_BUFFER   1024
+#include <prmem.h>
+#include <vidcap/vidcap.h>
+#include <vidcap/converters.h>
 
-#define SAMPLE          PRInt16
-#define SAMPLE_RATE     22050
-#define SAMPLE_QUALITY  (float)(0.4)
-
-class AudioSource {
+class VideoSourceNix : public VideoSource {
 public:
-    /* Reuse constructor and frame size getter */
-    AudioSource(int channels, int rate);
-    int GetFrameSize();
-    PRUint32 GetRate();
-    PRUint32 GetChannels();
+    VideoSourceNix(int w, int h);
+    ~VideoSourceNix();
 
-    /* Implement these two. Write 2byte, n-channel audio to pipe */
-    virtual nsresult Stop() = 0;
-    virtual nsresult Start(nsIOutputStream *pipe) = 0;
+    nsresult Stop();
+    nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
 
 protected:
-    /* You MUST set these two values in the constructor! */
-    int rate;
-    int channels;
+    vidcap_sapi *sapi;
+    vidcap_src *source;
+    vidcap_state *state;
+    nsIOutputStream *output;
+    struct vidcap_src_info *sources;
+    struct vidcap_fmt_info fmt_info;
+    nsIDOMCanvasRenderingContext2D *vCanvas;
 
-    PRLogModuleInfo *log;
-
+    static int Callback(
+        vidcap_src *src, void *data, struct vidcap_capture_info *video
+    );
+        
 };
 

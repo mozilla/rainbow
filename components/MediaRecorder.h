@@ -67,6 +67,10 @@
 #include "VideoSourceWin.h"
 #include "AudioSourceWin.h"
 #endif
+#ifdef RAINBOW_Nix
+#include "VideoSourceNix.h"
+#include "AudioSourceNix.h"
+#endif
 
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"

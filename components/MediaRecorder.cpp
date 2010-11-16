@@ -173,7 +173,10 @@ MediaRecorder::Encode(void *data)
      * a second and encode 10 frames of video and 88200 bytes of audio per
      * run of the loop?
      */
-    int a_frame_len = mr->params->rate/(mr->params->fps_n/mr->params->fps_d);
+    int a_frame_len = FRAMES_BUFFER;
+    if (mr->v_rec) {
+        a_frame_len = mr->params->rate/(mr->params->fps_n/mr->params->fps_d);
+    }
     int v_frame_size = mr->vState->backend->GetFrameSize();
     int a_frame_size = mr->aState->backend->GetFrameSize();
     int a_frame_total = a_frame_len * a_frame_size;
@@ -277,7 +280,7 @@ audio_enc:
         a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_len);
         for (i = 0; i < a_frame_len; i++){
             for (j = 0; j < (int)mr->params->chan; j++) {
-                a_buffer[j][i] = (float)(a_frame[i+j] / 32768.f);
+                a_buffer[j][i] = (float)((float)a_frame[i+j] / 32768.f);
             }
         }
 
@@ -340,8 +343,8 @@ MediaRecorder::SetupTheoraBOS()
     th_info_init(&vState->ti);
 
     /* Must be multiples of 16 */
-    vState->ti.frame_width = params->width + 15 & ~0xF;
-    vState->ti.frame_height = params->height + 15 & ~0xF;
+    vState->ti.frame_width = (params->width + 15) & ~0xF;
+    vState->ti.frame_height = (params->height + 15) & ~0xF;
     vState->ti.pic_width = params->width;
     vState->ti.pic_height = params->height;
     vState->ti.pic_x = (vState->ti.frame_width - params->width) >> 1 & ~1;
@@ -611,25 +614,26 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
         return NS_ERROR_FAILURE;
     }
 
-    /* Setup video backend */
+    /* Setup backends */
     #ifdef RAINBOW_Mac
+    aState->backend = new AudioSourceMac(params->chan, params->rate);
     vState->backend = new VideoSourceMac(params->width, params->height);
     #endif
     #ifdef RAINBOW_Win
+    aState->backend = new AudioSourceWin(params->chan, params->rate);
     vState->backend = new VideoSourceWin(params->width, params->height);
     #endif
+    #ifdef RAINBOW_Nix
+    aState->backend = new AudioSourceNix(params->chan, params->rate);
+    vState->backend = new VideoSourceNix(params->width, params->height);
+    #endif
 
-    /* Update fps */
+    /* Update parameters. What we asked for were just hints,
+     * may not end up the same */
     params->fps_n = vState->backend->GetFPSN();
     params->fps_d = vState->backend->GetFPSD();
-    
-    /* Setup audio backend */
-    #ifdef RAINBOW_Mac
-    aState->backend = new AudioSourceMac(params->chan, params->rate);
-    #endif
-    #ifdef RAINBOW_Win
-    aState->backend = new AudioSourceWin(params->chan, params->rate);
-    #endif
+    params->rate = aState->backend->GetRate();
+    params->chan = aState->backend->GetChannels();
 
     /* FIXME: device detection TBD */
     if (params->audio && (aState == nsnull)) {

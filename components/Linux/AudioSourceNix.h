@@ -34,42 +34,30 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-/*
- * Interface for video sources to implement. Not really neccessary because we
- * use only portaudio for all platforms, but just in case we switch to something
- * else in the future.
- * TODO: Figure out if and how to do device selection
- */
-#include <prlog.h>
-#include <nsError.h>
-#include <nsIOutputStream.h>
+#include "AudioSource.h"
+#include <prmem.h>
+#include <prthread.h>
+#include <alsa/asoundlib.h>
 
-/* Defaults */
-#define NUM_CHANNELS    1
-#define FRAMES_BUFFER   1024
+/* Hopefully this is the default capture device */
+#define ADDR "hw:0,0"
 
-#define SAMPLE          PRInt16
-#define SAMPLE_RATE     22050
-#define SAMPLE_QUALITY  (float)(0.4)
-
-class AudioSource {
+class AudioSourceNix : public AudioSource {
 public:
-    /* Reuse constructor and frame size getter */
-    AudioSource(int channels, int rate);
-    int GetFrameSize();
-    PRUint32 GetRate();
-    PRUint32 GetChannels();
+    AudioSourceNix(int c, int r);
+    ~AudioSourceNix();
 
-    /* Implement these two. Write 2byte, n-channel audio to pipe */
-    virtual nsresult Stop() = 0;
-    virtual nsresult Start(nsIOutputStream *pipe) = 0;
+    nsresult Stop();
+    nsresult Start(nsIOutputStream *pipe);
 
 protected:
-    /* You MUST set these two values in the constructor! */
-    int rate;
-    int channels;
-
-    PRLogModuleInfo *log;
+    PRBool rec, g2g;
+    snd_pcm_t *device;
+    snd_pcm_hw_params_t *params;
+    
+    PRThread *capture;
+    nsIOutputStream *output;
+    static void CaptureThread(void *data);
 
 };
 
