@@ -56,7 +56,7 @@
 class AudioSource {
 public:
     /* Reuse constructor and frame size getter */
-    AudioSource(int channels, int rate, float quality);
+    AudioSource(int channels, int rate);
     int GetFrameSize();
 
     /* Implement these two. Write 2byte, n-channel audio to pipe */
@@ -66,7 +66,6 @@ public:
 protected:
     int rate;
     int channels;
-    float quality;
     PRLogModuleInfo *log;
 
 };

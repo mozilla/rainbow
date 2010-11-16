@@ -56,7 +56,7 @@ so_target = $(target:=.$(so))
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
     VideoSource.cpp VideoSource$(teh).cpp \
-    AudioSource.cpp AudioSourcePortaudio.cpp
+    AudioSource.cpp AudioSource$(teh).cpp
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
@@ -155,8 +155,8 @@ ifeq ($(os), WINNT)
     ../lib/WINNT_x86-msvc/libogg.lib \
     ../lib/WINNT_x86-msvc/libvorbis.lib \
     ../lib/WINNT_x86-msvc/libtheora.lib \
-    ../lib/WINNT_x86-msvc/portaudio.lib \
-    strmiids.lib comsuppw.lib ole32.lib oleaut32.lib user32.lib advapi32.lib $(ldops)
+    strmiids.lib comsuppw.lib ole32.lib \
+    oleaut32.lib user32.lib advapi32.lib winmm.lib $(ldops)
 rcflags := -r $(headers)
 else
 ifeq ($(os), Linux)

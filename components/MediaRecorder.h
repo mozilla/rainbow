@@ -59,16 +59,15 @@
 #include <nsComponentManagerUtils.h>
 #include <nsIDOMCanvasRenderingContext2D.h>
 
-/* ifdefs are evil, but I am powerless */
+/* ifdefs are evil, but I am powerless. This is better than factory classes! */
 #ifdef RAINBOW_Mac
 #include "VideoSourceMac.h"
+#include "AudioSourcePortaudio.h"
 #endif
 #ifdef RAINBOW_Win
 #include "VideoSourceWin.h"
+#include "AudioSourceWin.h"
 #endif
-
-/* We use portaudio for all platforms currently */
-#include "AudioSourcePortaudio.h"
 
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"

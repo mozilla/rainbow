@@ -35,19 +35,30 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "AudioSource.h"
+#include <windows.h>
+#include <mmsystem.h>
+#include <stdio.h>
 
-AudioSource::AudioSource(int c, int r)
-{
-    rate = r;
-    channels = c;
+#define NUM_BUFFERS 6
 
-    /* Setup logger */
-    log = PR_NewLogModule("AudioSource");
-}
+class AudioSourceWin : public AudioSource {
+public:
+    AudioSourceWin(int c, int r);
+    ~AudioSourceWin();
 
-int
-AudioSource::GetFrameSize()
-{
-    return sizeof(SAMPLE) * channels;
-}
+    nsresult Stop();
+    nsresult Start(nsIOutputStream *pipe);
 
+protected:
+    FILE *ops;
+    PRBool rec;
+    DWORD thread;
+    HWAVEIN	handle;
+    PRUint32 pending;
+    WAVEFORMATEX format;
+    WAVEHDR	buffer[NUM_BUFFERS];
+    
+    nsIOutputStream *output;
+    static DWORD WINAPI Callback(void *arg);
+
+};

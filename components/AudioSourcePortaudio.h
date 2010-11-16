@@ -39,7 +39,7 @@
 
 class AudioSourcePortaudio : public AudioSource {
 public:
-    AudioSourcePortaudio(int c, int r, float q);
+    AudioSourcePortaudio(int c, int r);
     ~AudioSourcePortaudio();
 
     nsresult Stop();
@@ -57,4 +57,3 @@ protected:
     );
 
 };
-

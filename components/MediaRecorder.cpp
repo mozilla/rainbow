@@ -178,7 +178,7 @@ MediaRecorder::Encode(void *data)
     int v_frame_size = mr->vState->backend->GetFrameSize();
     int a_frame_size = mr->aState->backend->GetFrameSize();
     int a_frame_total = a_frame_len * a_frame_size;
-
+        
     for (;;) {
 
         if (mr->v_rec) {
@@ -259,7 +259,7 @@ audio_enc:
         do mr->aState->aPipeIn->Available(&rd);
             while ((rd < (PRUint32)a_frame_total) && !mr->a_stp);
         rv = mr->aState->aPipeIn->Read((char *)a_frame, a_frame_total, &rd);
-
+        
         if (rd == 0) {
             /* EOF. We're done. */
             PR_Free(a_frame);
@@ -274,7 +274,7 @@ audio_enc:
             return;
         }
 
-        /* Uninterleave samples. Alternatively, have portaudio do this? */
+        /* Uninterleave samples */
         a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_total);
         for (i = 0; i < a_frame_len; i++){
             for (j = 0; j < (int)mr->params->chan; j++) {
@@ -608,7 +608,7 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
  */
 nsresult
 MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
-{
+{   
     nsresult rv;
     if (a_rec || v_rec) {
         PR_LOG(log, PR_LOG_NOTICE, ("Recording in progress\n"));
@@ -626,11 +626,14 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
     /* Update fps */
     params->fps_n = vState->backend->GetFPSN();
     params->fps_d = vState->backend->GetFPSD();
-
-    /* Audio backend same for all platforms */
-    aState->backend = new AudioSourcePortaudio(
-        params->chan, params->rate, (float)params->qual
-    );
+    
+    /* Setup audio backend */
+    #ifdef RAINBOW_Mac
+    aState->backend = new AudioSourcePortaudio(params->chan, params->rate);
+    #endif
+    #ifdef RAINBOW_Win
+    aState->backend = new AudioSourceWin(params->chan, params->rate);
+    #endif
 
     /* FIXME: device detection TBD */
     if (params->audio && (aState == nsnull)) {
@@ -673,7 +676,10 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
     if (params->audio) {
         SetupVorbisHeaders();
         rv = aState->backend->Start(aState->aPipeOut);
-        if (NS_FAILED(rv)) return rv;
+        if (NS_FAILED(rv)) {
+            /* FIXME: Stop and clean up video! */
+            return rv;
+        }
         a_rec = PR_TRUE;
         a_stp = PR_FALSE;
     }

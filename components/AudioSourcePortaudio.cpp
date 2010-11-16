@@ -67,8 +67,8 @@ GetDefaultInputDevice()
     return paNoDevice;
 }
 
-AudioSourcePortaudio::AudioSourcePortaudio(int c, int r, float q)
-    : AudioSource(c, r, q)
+AudioSourcePortaudio::AudioSourcePortaudio(int c, int r)
+    : AudioSource(c, r)
 {
     stream = NULL;
     if (Pa_Initialize() != paNoError) {
