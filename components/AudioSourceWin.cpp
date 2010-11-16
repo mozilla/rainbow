@@ -134,12 +134,6 @@ AudioSourceWin::Callback(void *data)
     PRUint32 wr;
     AudioSourceWin *asw = static_cast<AudioSourceWin*>(data);
     
-#ifdef DEBUG
-    HANDLE WaveFileHandle = CreateFile(
-        "test.snd", GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0
-    );
-#endif
-
 	/* This MSG comes from the audio driver */
 	while (GetMessage(&msg, 0, 0, 0) == 1) {
 		
@@ -149,14 +143,6 @@ AudioSourceWin::Callback(void *data)
 			{
                 /* A buffer has been filled by the driver */
 				if (((WAVEHDR *)msg.lParam)->dwBytesRecorded) {
-
-#ifdef DEBUG
-    WriteFile(
-        WaveFileHandle, ((WAVEHDR *)msg.lParam)->lpData,
-        ((WAVEHDR *)msg.lParam)->dwBytesRecorded, &msg.time, 0
-    );
-#endif DEBUG
-
                     /* Write samples to pipe */
                     rv = asw->output->Write(
                         (const char *)((WAVEHDR *)msg.lParam)->lpData,
@@ -191,6 +177,5 @@ AudioSourceWin::Callback(void *data)
 		}
 	}
 
-    CloseHandle(WaveFileHandle);
-	return(0);
+	return 0;
 }
