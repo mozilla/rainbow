@@ -34,7 +34,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "AudioSourcePortaudio.h"
+#include "AudioSourceMac.h"
 
 /*
  * Try to intelligently fetch a default audio input device
@@ -67,7 +67,7 @@ GetDefaultInputDevice()
     return paNoDevice;
 }
 
-AudioSourcePortaudio::AudioSourcePortaudio(int c, int r)
+AudioSourceMac::AudioSourceMac(int c, int r)
     : AudioSource(c, r)
 {
     stream = NULL;
@@ -82,13 +82,13 @@ AudioSourcePortaudio::AudioSourcePortaudio(int c, int r)
     }
 }
 
-AudioSourcePortaudio::~AudioSourcePortaudio()
+AudioSourceMac::~AudioSourceMac()
 {
     Pa_Terminate();
 }
 
 nsresult
-AudioSourcePortaudio::Start(nsIOutputStream *pipe)
+AudioSourceMac::Start(nsIOutputStream *pipe)
 {
     PaError err;
     PaStreamParameters param;    
@@ -102,7 +102,7 @@ AudioSourcePortaudio::Start(nsIOutputStream *pipe)
 
     err = Pa_OpenStream(
         &stream, &param, NULL, rate, FRAMES_BUFFER,
-        paClipOff, AudioSourcePortaudio::Callback, this
+        paClipOff, AudioSourceMac::Callback, this
     );
 
     if (err != paNoError) {
@@ -120,7 +120,7 @@ AudioSourcePortaudio::Start(nsIOutputStream *pipe)
 }
 
 nsresult
-AudioSourcePortaudio::Stop()
+AudioSourceMac::Stop()
 {
     if (Pa_StopStream(stream) != paNoError) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not close stream!\n"));
@@ -131,13 +131,13 @@ AudioSourcePortaudio::Stop()
 }
 
 int
-AudioSourcePortaudio::Callback(const void *input, void *output,
+AudioSourceMac::Callback(const void *input, void *output,
     unsigned long frames, const PaStreamCallbackTimeInfo* timeInfo,
     PaStreamCallbackFlags statusFlags, void *data)
 {
     nsresult rv;
     PRUint32 wr;
-    AudioSourcePortaudio *asa = static_cast<AudioSourcePortaudio*>(data);
+    AudioSourceMac *asa = static_cast<AudioSourceMac*>(data);
 
     /* Write to pipe and return quickly */
     rv = asa->output->Write(

@@ -37,10 +37,10 @@
 #include "AudioSource.h"
 #include <portaudio.h>
 
-class AudioSourcePortaudio : public AudioSource {
+class AudioSourceMac : public AudioSource {
 public:
-    AudioSourcePortaudio(int c, int r);
-    ~AudioSourcePortaudio();
+    AudioSourceMac(int c, int r);
+    ~AudioSourceMac();
 
     nsresult Stop();
     nsresult Start(nsIOutputStream *pipe);

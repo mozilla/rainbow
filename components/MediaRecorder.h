@@ -62,7 +62,7 @@
 /* ifdefs are evil, but I am powerless. This is better than factory classes! */
 #ifdef RAINBOW_Mac
 #include "VideoSourceMac.h"
-#include "AudioSourcePortaudio.h"
+#include "AudioSourceMac.h"
 #endif
 #ifdef RAINBOW_Win
 #include "VideoSourceWin.h"

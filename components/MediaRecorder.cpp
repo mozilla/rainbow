@@ -629,7 +629,7 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
     
     /* Setup audio backend */
     #ifdef RAINBOW_Mac
-    aState->backend = new AudioSourcePortaudio(params->chan, params->rate);
+    aState->backend = new AudioSourceMac(params->chan, params->rate);
     #endif
     #ifdef RAINBOW_Win
     aState->backend = new AudioSourceWin(params->chan, params->rate);
