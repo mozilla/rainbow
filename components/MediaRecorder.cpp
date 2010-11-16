@@ -145,7 +145,7 @@ MediaRecorder::Encode(void *data)
     PRUint32 wr;
     PRUint32 rd = 0;
 
-    PRUint8 *a_frame;
+    PRInt16 *a_frame;
     PRUint8 *v_frame;
     float **a_buffer;
     th_ycbcr_buffer v_buffer;
@@ -254,7 +254,7 @@ audio_enc:
         if (mr->a_rec) {
 
         /* Make sure we get enough frames in unless we're at the end */
-        a_frame = (PRUint8 *) PR_Calloc(a_frame_total, sizeof(PRUint8));
+        a_frame = (PRInt16 *) PR_Calloc(a_frame_total, sizeof(PRUint8));
 
         do mr->aState->aPipeIn->Available(&rd);
             while ((rd < (PRUint32)a_frame_total) && !mr->a_stp);
@@ -275,13 +275,10 @@ audio_enc:
         }
 
         /* Uninterleave samples */
-        a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_total);
+        a_buffer = vorbis_analysis_buffer(&mr->aState->vd, a_frame_len);
         for (i = 0; i < a_frame_len; i++){
             for (j = 0; j < (int)mr->params->chan; j++) {
-                a_buffer[j][i] =
-                    (float)((a_frame[i*a_frame_size+((j*2)+1)]<<8) |
-                        ((0x00ff&(int)a_frame[i*a_frame_size+(j*2)]))) /
-                            32768.f;
+                a_buffer[j][i] = (float)(a_frame[i+j] / 32768.f);
             }
         }
 

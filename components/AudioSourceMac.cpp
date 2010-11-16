@@ -95,7 +95,7 @@ AudioSourceMac::Start(nsIOutputStream *pipe)
 
     param.device = source;
     param.channelCount = channels;
-    param.sampleFormat = SAMPLE_FORMAT;
+    param.sampleFormat = paInt16;
     param.suggestedLatency =
         Pa_GetDeviceInfo(source)->defaultLowInputLatency;
     param.hostApiSpecificStreamInfo = NULL;

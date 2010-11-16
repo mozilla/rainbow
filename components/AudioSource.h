@@ -50,7 +50,6 @@
 
 #define SAMPLE          PRInt16
 #define SAMPLE_RATE     22050
-#define SAMPLE_FORMAT   paInt16
 #define SAMPLE_QUALITY  (float)(0.4)
 
 class AudioSource {
