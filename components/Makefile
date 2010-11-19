@@ -55,8 +55,14 @@ so_target = $(target:=.$(so))
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
-    VideoSource.cpp $(os)/VideoSource$(teh).cpp \
-    AudioSource.cpp $(os)/AudioSource$(teh).cpp
+    VideoSource.cpp AudioSource.cpp $(os)/AudioSource$(teh).cpp
+ifeq ($(os), Darwin)
+  obj_sources = $(os)/VideoSource$(teh).mm
+  obj_objects = $(os)/VideoSource$(teh).o
+else
+  cpp_sources += $(os)/VideoSource$(teh).cpp
+endif
+cpp_objects = $(cpp_sources:.cpp=.o)
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
@@ -72,7 +78,6 @@ endif
 
 idl_headers = $(idl:.idl=.h)
 idl_typelib = $(idl:.idl=.xpt)
-cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
 cppflags = -DRAINBOW_$(teh)
@@ -113,17 +118,17 @@ ifeq ($(os), Darwin)
     -Wl,-dead_strip \
     ../lib/Darwin_i386-gcc3/libogg.a \
     ../lib/Darwin_i386-gcc3/libvorbis.a \
-    ../lib/Darwin_i386-gcc3/libvidcap.a \
     ../lib/Darwin_i386-gcc3/libtheora.a \
     ../lib/Darwin_i386-gcc3/libtheoraenc.a \
     ../lib/Darwin_i386-gcc3/libvorbisenc.a \
     ../lib/Darwin_i386-gcc3/libportaudio.a \
     -framework Carbon \
     -framework CoreAudio \
-    -framework QuartzCore \
-    -framework QuickTime \
     -framework AudioUnit \
     -framework AudioToolbox \
+    -framework Foundation \
+    -framework QTKit \
+    -framework CoreVideo \
     $(libdirs) $(libs)
 else
 ifeq ($(os), WINNT)
@@ -150,7 +155,6 @@ ifeq ($(os), WINNT)
     -DHAVE_OLEACC_IDL=1 -DHAVE_ATLBASE_H=1 -DHAVE_WPCAPI_H=1 -D_X86_=1 \
     -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1
   ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS -NXCOMPAT -SAFESEH \
-    -IMPLIB:fake.lib \
     $(libdirs) $(libs) \
     ../lib/WINNT_x86-msvc/libogg.lib \
     ../lib/WINNT_x86-msvc/libvorbis.lib \
@@ -199,9 +203,8 @@ all: build
 build: $(so_target) $(idl_typelib)
 
 clean:
-	rm -f $(so_target) $(cpp_objects) \
-  $(idl_typelib) $(idl_headers) \
-	$(target:=.res) fake.lib fake.exp $(target).pdb $(target).ilk
+	rm -f $(so_target) $(cpp_objects) $(obj_objects) \
+    $(idl_typelib) $(idl_headers) $(target:=.res) $(target).pdb $(target).ilk
 
 # rules to build the c headers and .xpt from idl
 $(idl_headers): $(idl)
@@ -215,8 +218,11 @@ ifeq ($(os), Darwin)
   $(cpp_objects): $(cpp_sources)
 	$(cxx) -o $@ $(cppflags) $(@:.o=.cpp)
 
-  $(so_target): $(idl_headers) $(cpp_objects)
-	$(cxx) -o $@ $(ldflags) $(cpp_objects)
+  $(obj_objects): $(obj_sources)
+	$(cxx) -o $@ $(cppflags) $(@:.o=.mm)
+
+  $(so_target): $(idl_headers) $(cpp_objects) $(obj_objects)
+	$(cxx) -o $@ $(ldflags) $(cpp_objects) $(obj_objects)
 	chmod +x $@
 else
 ifeq ($(os), WINNT)

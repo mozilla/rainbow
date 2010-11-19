@@ -35,15 +35,10 @@
  * ***** END LICENSE BLOCK ***** */
 
 /*
- * Video source implementation for Mac.
- * We're using libvidcap but we should switch to Quicktime
- * for 64-bit compliance.
+ * Video source implementation for Mac (Obj-C QTKit)
  */
 #include "VideoSource.h"
-
 #include <prmem.h>
-#include <vidcap/vidcap.h>
-#include <vidcap/converters.h>
 
 class VideoSourceMac : public VideoSource {
 public:
@@ -54,17 +49,7 @@ public:
     nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
 
 protected:
-    vidcap_sapi *sapi;
-    vidcap_src *source;
-    vidcap_state *state;
-    nsIOutputStream *output;
-    struct vidcap_src_info *sources;
-    struct vidcap_fmt_info fmt_info;
-    nsIDOMCanvasRenderingContext2D *vCanvas;
+    void *objc;
 
-    static int Callback(
-        vidcap_src *src, void *data, struct vidcap_capture_info *video
-    );
-        
 };
 
