@@ -50,6 +50,7 @@ public:
 
 protected:
     void *objc;
-
+    void *pool;
+    
 };
 

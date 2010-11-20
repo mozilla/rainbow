@@ -42,9 +42,9 @@
     QTCaptureSession *mSession;
     QTCaptureDeviceInput *mVideo;
     QTCaptureDecompressedVideoOutput *mOutput;
-	CVPixelBufferRef mCurrentFrame;
-	
-	BOOL rec;
+    CVPixelBufferRef mCurrentFrame;
+    
+    BOOL rec;
     FILE *tmp;
     nsIOutputStream *output;
     nsIDOMCanvasRenderingContext2D *vCanvas;
@@ -56,9 +56,9 @@
 - (BOOL)stop;
 - (void)processFrames;
 - (void)captureOutput:(QTCaptureOutput *)captureOutput
-	didOutputVideoFrame:(CVImageBufferRef)frame
-	withSampleBuffer:(QTSampleBuffer*)sampleBuffer
-	fromConnection:(QTCaptureConnection *)connection;
+    didOutputVideoFrame:(CVImageBufferRef)frame
+    withSampleBuffer:(QTSampleBuffer*)sampleBuffer
+    fromConnection:(QTCaptureConnection *)connection;
 
 @end
 
@@ -68,32 +68,32 @@
     withCanvas:(nsIDOMCanvasRenderingContext2D *)ctx
     width:(int)w andHeight:(int)h
 {
-	NSError *error;
-	BOOL success = NO;
-	mSession = [[QTCaptureSession alloc] init];
-	
-	QTCaptureDevice *video =
-		[QTCaptureDevice defaultInputDeviceWithMediaType:QTMediaTypeVideo];
-	success = [video open:&error];
-	
-	if (!success) {
-		NSLog(@"Could not acquire device!\n");
-		return NO;
-	}
-	
+    NSError *error;
+    BOOL success = NO;
+    mSession = [[QTCaptureSession alloc] init];
+    
+    QTCaptureDevice *video =
+        [QTCaptureDevice defaultInputDeviceWithMediaType:QTMediaTypeVideo];
+    success = [video open:&error];
+    
+    if (!success) {
+        NSLog(@"Could not acquire device!\n");
+        return NO;
+    }
+    
     NSLog(@"Acquired %@", [video localizedDisplayName]);
 
-	mVideo = [[QTCaptureDeviceInput alloc] initWithDevice:video];
-	success = [mSession addInput:mVideo error:&error];
-	
-	if (!success) {
-		NSLog(@"Could not add input to session!");
-		return NO;
-	}
-	
-	mOutput = [[QTCaptureDecompressedVideoOutput alloc] init];
-	[mOutput setDelegate:self];
-	
+    mVideo = [[QTCaptureDeviceInput alloc] initWithDevice:video];
+    success = [mSession addInput:mVideo error:&error];
+    
+    if (!success) {
+        NSLog(@"Could not add input to session!");
+        return NO;
+    }
+    
+    mOutput = [[QTCaptureDecompressedVideoOutput alloc] init];
+    [mOutput setDelegate:self];
+    
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
         [NSNumber numberWithDouble:w], (id)kCVPixelBufferWidthKey,
         [NSNumber numberWithDouble:h], (id)kCVPixelBufferHeightKey,
@@ -103,114 +103,117 @@
         nil];
     [mOutput setPixelBufferAttributes:attributes];
 
-	success = [mSession addOutput:mOutput error:&error];
-	if (!success) {
-		NSLog(@"Could not add output to session!");
-		return NO;
-	}
-	
+    success = [mSession addOutput:mOutput error:&error];
+    if (!success) {
+        NSLog(@"Could not add output to session!");
+        return NO;
+    }
+    
     output = pipe;
     vCanvas = ctx;
 
     tmp = fopen("/Users/anant/Code/tmp/qtkit/test.raw", "w+");
-	[mSession startRunning];
-	rec = YES;
-	[NSThread detachNewThreadSelector:@selector(processFrames)
-		toTarget:self withObject:nil];
-	
+    [mSession startRunning];
+    rec = YES;
+    [NSThread detachNewThreadSelector:@selector(processFrames)
+        toTarget:self withObject:nil];
+    
     NSLog(@"Began session %d!", [mSession isRunning]);
-	return YES;
+    return YES;
 }
 
 - (BOOL)stop
 {
     [mSession stopRunning];
-	rec = NO;
-	fclose(tmp);
+    rec = NO;
+    fclose(tmp);
 
-	if ([[mVideo device] isOpen])
-		[[mVideo device] close];
-	
+    if ([[mVideo device] isOpen])
+        [[mVideo device] close];
+    
     NSLog(@"Ended session %d!", [mSession isRunning]);
-	return YES;
+    return YES;
 }
 
 - (void)dealloc
 {
-	[mSession release];
-	[mVideo release];
-	[mOutput release];
-	
-	[super dealloc];
+    [mSession release];
+    [mVideo release];
+    [mOutput release];
+    
+    [super dealloc];
 }
 
 - (void)captureOutput:(QTCaptureOutput *)captureOutput
-	didOutputVideoFrame:(CVImageBufferRef)videoFrame
-	withSampleBuffer:(QTSampleBuffer *)sampleBuffer
-	fromConnection:(QTCaptureConnection *)connection
+    didOutputVideoFrame:(CVImageBufferRef)videoFrame
+    withSampleBuffer:(QTSampleBuffer *)sampleBuffer
+    fromConnection:(QTCaptureConnection *)connection
 {
-	CVPixelBufferRef toRelease;
+    NSLog(@"CALLBACK!!!! %@", [NSRunLoop currentRunLoop]);
+    
+    CVPixelBufferRef toRelease;
     CVBufferRetain(videoFrame);
-
-	@synchronized (self) {
-		toRelease = mCurrentFrame;
-		mCurrentFrame = videoFrame;
-	}
-	
-	CVBufferRelease(toRelease);
+    
+    @synchronized (self) {
+        toRelease = mCurrentFrame;
+        mCurrentFrame = videoFrame;
+    }
+    
+    CVBufferRelease(toRelease);
 }
 
 -(void)processFrames
 {
-	while (rec) {
-		CVPixelBufferRef frame;
-		@synchronized (self) {
-			frame = CVBufferRetain(mCurrentFrame);
-		}
-		
-		if (frame) {
-			CVPixelBufferLockBaseAddress(frame, 0);
-    		void *addr;
-    		nsresult rv;
-    		PRUint32 wr;
-    		size_t l, r, t, b, row, cx;
+    while (rec) {
+        CVPixelBufferRef frame;
+        @synchronized (self) {
+            frame = CVBufferRetain(mCurrentFrame);
+        }
+        
+        if (frame) {
+            CVPixelBufferLockBaseAddress(frame, 0);
+            void *addr;
+            nsresult rv;
+            PRUint32 wr;
+            size_t l, r, t, b, row, cx;
 
-    		CVPixelBufferGetExtendedPixels(frame, &l, &r, &t, &b);
+            CVPixelBufferGetExtendedPixels(frame, &l, &r, &t, &b);
    
-    		row = CVPixelBufferGetBytesPerRow(frame);
-    		cx = CVPixelBufferGetPlaneCount(frame);
-    		size_t w = CVPixelBufferGetWidth(frame);
-    		size_t h = CVPixelBufferGetHeight(frame);
+            row = CVPixelBufferGetBytesPerRow(frame);
+            cx = CVPixelBufferGetPlaneCount(frame);
+            size_t w = CVPixelBufferGetWidth(frame);
+            size_t h = CVPixelBufferGetHeight(frame);
 
-    		NSLog(@"w:%d h:%d l:%d r:%d t:%d b:%d r:%d c:%d\n", w, h, l, r, t, b, row, cx);
+            //NSLog(@"THREAD!!!! %@", [NSRunLoop currentRunLoop]);
+            //NSLog(@"w:%d h:%d l:%d r:%d t:%d b:%d r:%d c:%d\n", w, h, l, r, t, b, row, cx);
 
-    		int fsize = w * h * 4;
-    		int isize = (w * h * 3) / 2;
+            int fsize = w * h * 4;
+            int isize = (w * h * 3) / 2;
 
-    		/* Planar i420 frame. Start from Y plane and upto isize bytes */
-    		addr = CVPixelBufferGetBaseAddressOfPlane(frame, 0);
-    		fwrite(addr, isize, 1, tmp);
+            /* Planar i420 frame. Start from Y plane and upto isize bytes */
+            addr = CVPixelBufferGetBaseAddressOfPlane(frame, 0);
+            fwrite(addr, isize, 1, tmp);
 
-    		CVPixelBufferUnlockBaseAddress(frame, 0);
-    		CVBufferRelease(frame);
+            CVPixelBufferUnlockBaseAddress(frame, 0);
+            CVBufferRelease(frame);
 
-			/* Write to pipe */
-		    rv = output->Write(
-		        (const char *)addr, isize, &wr
-		    );
+            /* Write to pipe */
+            rv = output->Write(
+                (const char *)addr, isize, &wr
+            );
 
-		    /* Write to canvas, if needed */
-		    if (vCanvas) {
-		        nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[fsize]);
-		        I420toRGB32(w, h, (const char *)addr, (char *)rgb32.get());
+            /* Write to canvas, if needed */
+            if (vCanvas) {
+                nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[fsize]);
+                I420toRGB32(w, h, (const char *)addr, (char *)rgb32.get());
 
-		        nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
-		            vCanvas, w, h, rgb32, fsize
-		        );
-		        rv = NS_DispatchToMainThread(render);
-		    }
-		}
-	}
+                nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
+                    vCanvas, w, h, rgb32, fsize
+                );
+                rv = NS_DispatchToMainThread(render);
+            }
+        }
+    }
 }
 
 @end
@@ -222,6 +225,7 @@ VideoSourceMac::VideoSourceMac(int w, int h)
     fps_n = 15;
     fps_d = 1;
     
+    pool = [[NSAutoreleasePool alloc] init];
     objc = [[MozQTCapture alloc] init];
     g2g = PR_TRUE;
 }
@@ -229,6 +233,7 @@ VideoSourceMac::VideoSourceMac(int w, int h)
 VideoSourceMac::~VideoSourceMac()
 {
     [(id)objc release];
+    [(id)pool release];
 }
 
 nsresult
