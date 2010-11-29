@@ -37,6 +37,8 @@
 #import <QTKit/QTkit.h>
 #include "VideoSourceMac.h"
 
+FILE *tmp;
+
 /* Objective-C Implementation here */
 @interface MozQTCapture : NSObject {
     QTCaptureSession *mSession;
@@ -45,7 +47,6 @@
     CVPixelBufferRef mCurrentFrame;
     
     BOOL rec;
-    FILE *tmp;
     nsIOutputStream *output;
     nsIDOMCanvasRenderingContext2D *vCanvas;
 }
@@ -54,11 +55,44 @@
     withCanvas:(nsIDOMCanvasRenderingContext2D *)ctx
     width:(int)w andHeight:(int)h;
 - (BOOL)stop;
-- (void)processFrames;
 - (void)captureOutput:(QTCaptureOutput *)captureOutput
     didOutputVideoFrame:(CVImageBufferRef)frame
     withSampleBuffer:(QTSampleBuffer*)sampleBuffer
     fromConnection:(QTCaptureConnection *)connection;
+
+@end
+
+
+@interface MozQTVideoOutput : QTCaptureDecompressedVideoOutput {
+}
+
+- (void)outputVideoFrame:(CVImageBufferRef)videoFrame
+    withSampleBuffer:(QTSampleBuffer *)sampleBuffer
+    fromConnection:(QTCaptureConnection *)connection;
+    
+@end
+
+@implementation MozQTVideoOutput
+
+- (void)outputVideoFrame:(CVImageBufferRef)videoFrame
+    withSampleBuffer:(QTSampleBuffer *)sampleBuffer
+    fromConnection:(QTCaptureConnection *)connection
+{
+    CVBufferRetain(videoFrame);
+    CVPixelBufferLockBaseAddress(videoFrame, 0);
+    
+    void *addr;
+    size_t w, h;
+    w = CVPixelBufferGetWidth(videoFrame);
+    h = CVPixelBufferGetHeight(videoFrame);
+    
+    addr = CVPixelBufferGetBaseAddressOfPlane(videoFrame, 0);
+    /* each i420 frame is w * h * 3 / 2 bytes long */
+    fwrite(addr, (w * h * 3) / 2, 1, tmp);
+    
+    CVPixelBufferUnlockBaseAddress(videoFrame, 0);
+    CVBufferRelease(videoFrame);
+}
 
 @end
 
@@ -91,8 +125,9 @@
         return NO;
     }
     
-    mOutput = [[QTCaptureDecompressedVideoOutput alloc] init];
-    [mOutput setDelegate:self];
+    mOutput = [[MozQTVideoOutput alloc] init];
+    //[mOutput setDelegate:self];
+    [mOutput setAutomaticallyDropsLateVideoFrames:YES];
     
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
         [NSNumber numberWithDouble:w], (id)kCVPixelBufferWidthKey,
@@ -115,9 +150,6 @@
     tmp = fopen("/Users/anant/Code/tmp/qtkit/test.raw", "w+");
     [mSession startRunning];
     rec = YES;
-    [NSThread detachNewThreadSelector:@selector(processFrames)
-        toTarget:self withObject:nil];
-    
     NSLog(@"Began session %d!", [mSession isRunning]);
     return YES;
 }
@@ -145,75 +177,11 @@
 }
 
 - (void)captureOutput:(QTCaptureOutput *)captureOutput
-    didOutputVideoFrame:(CVImageBufferRef)videoFrame
+    didOutputVideoFrame:(CVImageBufferRef)frame
     withSampleBuffer:(QTSampleBuffer *)sampleBuffer
     fromConnection:(QTCaptureConnection *)connection
 {
     NSLog(@"CALLBACK!!!! %@", [NSRunLoop currentRunLoop]);
-    
-    CVPixelBufferRef toRelease;
-    CVBufferRetain(videoFrame);
-    
-    @synchronized (self) {
-        toRelease = mCurrentFrame;
-        mCurrentFrame = videoFrame;
-    }
-    
-    CVBufferRelease(toRelease);
-}
-
--(void)processFrames
-{
-    while (rec) {
-        CVPixelBufferRef frame;
-        @synchronized (self) {
-            frame = CVBufferRetain(mCurrentFrame);
-        }
-        
-        if (frame) {
-            CVPixelBufferLockBaseAddress(frame, 0);
-            void *addr;
-            nsresult rv;
-            PRUint32 wr;
-            size_t l, r, t, b, row, cx;
-
-            CVPixelBufferGetExtendedPixels(frame, &l, &r, &t, &b);
-   
-            row = CVPixelBufferGetBytesPerRow(frame);
-            cx = CVPixelBufferGetPlaneCount(frame);
-            size_t w = CVPixelBufferGetWidth(frame);
-            size_t h = CVPixelBufferGetHeight(frame);
-
-            //NSLog(@"THREAD!!!! %@", [NSRunLoop currentRunLoop]);
-            //NSLog(@"w:%d h:%d l:%d r:%d t:%d b:%d r:%d c:%d\n", w, h, l, r, t, b, row, cx);
-
-            int fsize = w * h * 4;
-            int isize = (w * h * 3) / 2;
-
-            /* Planar i420 frame. Start from Y plane and upto isize bytes */
-            addr = CVPixelBufferGetBaseAddressOfPlane(frame, 0);
-            fwrite(addr, isize, 1, tmp);
-
-            CVPixelBufferUnlockBaseAddress(frame, 0);
-            CVBufferRelease(frame);
-
-            /* Write to pipe */
-            rv = output->Write(
-                (const char *)addr, isize, &wr
-            );
-
-            /* Write to canvas, if needed */
-            if (vCanvas) {
-                nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[fsize]);
-                I420toRGB32(w, h, (const char *)addr, (char *)rgb32.get());
-
-                nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
-                    vCanvas, w, h, rgb32, fsize
-                );
-                rv = NS_DispatchToMainThread(render);
-            }
-        }
-    }
 }
 
 @end
@@ -246,6 +214,7 @@ VideoSourceMac::Start(
     MozQTCapture *mqtc = (id)objc;
     if ([mqtc start:pipe withCanvas:ctx width:width andHeight:height]) {
         NSLog(@"Started MozQTCapture!");
+        //[[NSRunLoop mainRunLoop] run];
         return NS_OK;
     } else {
         return NS_ERROR_FAILURE;
