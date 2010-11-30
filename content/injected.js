@@ -2,15 +2,26 @@
  * Wrap IMediaRecorder in HTML5 device like API. Not quite there, but close.
  * http://www.whatwg.org/specs/web-apps/current-work/complete/commands.html#devices
  */
-function StreamRecorder(params, ctx)
+function StreamFRecorder(params, ctx)
 {
     recFStart(params, ctx);
     return this;    
 }
-StreamRecorder.prototype.stop = function()
+StreamFRecorder.prototype.stop = function()
 {
     return recStop();
 }
+
+function StreamTRecorder(params, ctx, host, port)
+{
+    recTStart(params, ctx, host, port);
+    return this;
+}
+StreamTRecorder.prototype.stop = function()
+{
+    return recStop();
+}
+
 function SocketRecorder(params, ctx, sock)
 {
     recSStart(params, ctx, sock);
@@ -30,7 +41,10 @@ if (window && window.navigator) {
 
     window.navigator.service.media = {
         recordToFile: function(params, ctx) {
-            return new StreamRecorder(params, ctx);
+            return new StreamFRecorder(params, ctx);
+        },
+        recordToStream: function(params, ctx, host, port) {
+            return new StreamTRecorder(params, ctx, host, port);
         },
         recordToSocket: function(params, ctx, sock) {
             return new SocketRecorder(params, ctx, sock);

@@ -93,6 +93,22 @@ let Rainbow = {
         Rainbow._recording = true;
     },
 
+    recordToStream: function(prop, ctx, host, port) {
+        if (Rainbow._recording)
+            throw "Recording already in progress";
+
+        let bag = Rainbow._makePropertyBag(prop);
+        let tra = Cc["@mozilla.org/network/socket-transport-service;1"].
+            getService(Ci.nsISocketTransportService);
+
+        let sck = tra.createTransport(null, 0, host, port, null);
+        let str = sck.openOutputStream(0, 0, 0);
+
+        Cc["@labs.mozilla.com/media/recorder;1"].
+            getService(Ci.IMediaRecorder).recordToStream(bag, ctx, str);
+        Rainbow._recording = true;
+    },
+
     recordToSocket: function(prop, ctx, sock) {
         if (Rainbow._recording)
             throw "Recording already in progress";

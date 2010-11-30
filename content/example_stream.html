@@ -1,0 +1,52 @@
+<html>
+<head>
+    <title>Rainbow!</title>
+    <script type="application/javascript;version=1.8">
+        let Me = window.navigator.service.media;
+    </script>
+</head>
+<body style="margin:50px 0px;padding:0px;text-align:center;">
+    <h1>Streaming Example</h1>
+    <canvas id="tehcanvas" width="320" height="240"></canvas>
+    <p><input type="button" id="tehbutton" value="Start!"/></p>
+    <p id="tehmsg"></p>
+    <input type="file" id="tehfile" style="display:none;"></input>
+</body>
+<script type="application/javascript;version=1.8">
+    let Sr;
+    let Re = false;
+    let img = new Image();
+    let msg = document.getElementById("tehmsg");
+    let fil = document.getElementById("tehfile");
+    let but = document.getElementById("tehbutton");
+    let ctx = document.getElementById("tehcanvas").getContext("2d");
+
+    img.src = "rainbow.png";
+    img.onload = function() {
+        ctx.drawImage(img, 32, 0);
+    }
+
+    but.onclick = function() {
+        if (Re) {
+            // Stop recording
+            Sr.stop();
+            Re = false;
+            but.value = "Start!";
+            ctx.drawImage(img, 32, 0);
+
+            // See https://developer.mozilla.org/en/Using_files_from_web_applications
+            msg.innerHTML = "Your video was streamed!";
+        } else {
+            // Start recording
+            Re = true;
+            but.value = "Stop!";
+            msg.innerHTML = " ";
+            Sr = Me.recordToStream({
+                width: 320, height: 240,
+                quality: 0.2, channels: 1, rate: 11025
+            }, ctx, "localhost", 8080);
+        }
+    }
+</script>
+</html>
+

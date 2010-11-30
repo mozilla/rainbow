@@ -137,7 +137,7 @@ protected:
     nsresult SetupVorbisHeaders();
 
     nsCOMPtr<nsIWebSocket> pipeSock;
-    nsCOMPtr<nsIOutputStream> pipeFile;
+    nsCOMPtr<nsIOutputStream> pipeStream;
 
     nsCOMPtr<nsIAsyncInputStream> sockIn;
     nsCOMPtr<nsIAsyncOutputStream> sockOut;

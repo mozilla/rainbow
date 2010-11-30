@@ -36,6 +36,7 @@
 
 #include "nsILocalFile.idl"
 #include "nsIWebSocket.idl"
+#include "nsIOutputStream.idl"
 #include "nsIPropertyBag2.idl"
 #include "nsIDOMCanvasRenderingContext2D.idl"
 
@@ -45,6 +46,9 @@ interface IMediaRecorder : nsISupports
     void recordToFile(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
         in nsILocalFile file);
+    void recordToStream(in nsIPropertyBag2 prop,
+        in nsIDOMCanvasRenderingContext2D ctx,
+        in nsIOutputStream stream);
     void recordToSocket(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
         in nsIWebSocket sock);

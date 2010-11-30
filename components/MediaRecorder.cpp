@@ -105,8 +105,8 @@ MediaRecorder::WriteData(
     PRBool success;
     MediaRecorder *mr = static_cast<MediaRecorder*>(obj);
 
-    if (mr->pipeFile) {
-        return mr->pipeFile->Write((const char*)data, len, wr);
+    if (mr->pipeStream) {
+        return mr->pipeStream->Write((const char*)data, len, wr);
     }
 
     if (mr->pipeSock) {
@@ -307,7 +307,7 @@ MediaRecorder::Init()
     log = PR_NewLogModule("MediaRecorder");
 
     pipeSock = nsnull;
-    pipeFile = nsnull;
+    pipeStream = nsnull;
 
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
@@ -536,6 +536,43 @@ MediaRecorder::MakePipe(nsIAsyncInputStream **in,
 }
 
 /*
+ * Start recording to icecast stream
+ */
+NS_IMETHODIMP
+MediaRecorder::RecordToStream(
+    nsIPropertyBag2 *prop,
+    nsIDOMCanvasRenderingContext2D *ctx,
+    nsIOutputStream *stream
+)
+{
+    nsresult rv;
+    PRUint32 wr;
+    ParseProperties(prop);
+
+    pipeStream = do_QueryInterface(stream, &rv);
+    if (NS_FAILED(rv)) return rv;
+
+    /* Write Icecast source client headers. Looks like HTTP
+     * FIXME: These values must be configurable */
+    const char hdr4[] = "\r\n";
+    const char hdr1[] = "SOURCE /rainbow.ogg HTTP/1.0\r\n";
+    /* Basic auth for source:rainbow */
+    const char hdr2[] = "Authorization: Basic c291cmNlOnJhaW5ib3c=\r\n";
+    const char hdr3[] = "Content-Type: application/ogg\r\n";
+     
+    rv = pipeStream->Write(hdr1, strlen(hdr1), &wr);
+    if (NS_FAILED(rv) || wr != strlen(hdr1)) return rv;
+    rv = pipeStream->Write(hdr2, strlen(hdr2), &wr);
+    if (NS_FAILED(rv) || wr != strlen(hdr2)) return rv;
+    rv = pipeStream->Write(hdr3, strlen(hdr3), &wr);
+    if (NS_FAILED(rv) || wr != strlen(hdr3)) return rv;
+    rv = pipeStream->Write(hdr4, strlen(hdr4), &wr);
+    if (NS_FAILED(rv) || wr != strlen(hdr4)) return rv;
+
+    return Record(ctx);
+}
+
+/*
  * Start recording to file
  */
 NS_IMETHODIMP
@@ -553,7 +590,7 @@ MediaRecorder::RecordToFile(
         do_CreateInstance("@mozilla.org/network/file-output-stream;1")
     );
 
-    pipeFile = do_QueryInterface(stream, &rv);
+    pipeStream = do_QueryInterface(stream, &rv);
     if (NS_FAILED(rv)) return rv;
     rv = stream->Init(file, -1, -1, 0);
     if (NS_FAILED(rv)) return rv;
@@ -766,9 +803,9 @@ MediaRecorder::Stop()
     }
 
     /* GG */
-    if (pipeFile) {
-        pipeFile->Close();
-        pipeFile = nsnull;
+    if (pipeStream) {
+        pipeStream->Close();
+        pipeStream = nsnull;
     }
     if (pipeSock) {
         pipeSock = nsnull;
