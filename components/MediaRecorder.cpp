@@ -651,18 +651,19 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
         return NS_ERROR_FAILURE;
     }
 
-    /* Setup backends */
+    /* Setup backends. Kinect for Video */
+    vState->backend = new VideoSourceKinect(params->width, params->height);
     #ifdef RAINBOW_Mac
     aState->backend = new AudioSourceMac(params->chan, params->rate);
-    vState->backend = new VideoSourceMac(params->width, params->height);
+    //vState->backend = new VideoSourceMac(params->width, params->height);
     #endif
     #ifdef RAINBOW_Win
     aState->backend = new AudioSourceWin(params->chan, params->rate);
-    vState->backend = new VideoSourceWin(params->width, params->height);
+    //vState->backend = new VideoSourceWin(params->width, params->height);
     #endif
     #ifdef RAINBOW_Nix
     aState->backend = new AudioSourceNix(params->chan, params->rate);
-    vState->backend = new VideoSourceNix(params->width, params->height);
+    //vState->backend = new VideoSourceNix(params->width, params->height);
     #endif
 
     /* Update parameters. What we asked for were just hints,

@@ -56,7 +56,8 @@ so_target = $(target:=.$(so))
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
     VideoSource.cpp $(os)/VideoSource$(teh).cpp \
-    AudioSource.cpp $(os)/AudioSource$(teh).cpp
+    AudioSource.cpp $(os)/AudioSource$(teh).cpp \
+    Kinect/VideoSourceKinect.cpp
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
@@ -76,7 +77,7 @@ cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
 cppflags = -DRAINBOW_$(teh)
-headers = -I. -I$(os) -I$(sdkdir)/include \
+headers = -I. -I$(os) -IKinect -I$(sdkdir)/include \
     -I$(sdkdir)/include/system_wrappers \
     -I$(sdkdir)/include/xpcom \
     -I$(sdkdir)/include/string \
@@ -118,6 +119,9 @@ ifeq ($(os), Darwin)
     ../lib/Darwin_i386-gcc3/libtheoraenc.a \
     ../lib/Darwin_i386-gcc3/libvorbisenc.a \
     ../lib/Darwin_i386-gcc3/libportaudio.a \
+    ../lib/Darwin_i386-gcc3/libusb.a \
+    ../lib/Darwin_i386-gcc3/libfreenect.a \
+    -framework IOKit \
     -framework Carbon \
     -framework CoreAudio \
     -framework QuartzCore \
