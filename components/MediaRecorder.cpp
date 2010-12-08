@@ -98,38 +98,8 @@ nsresult
 MediaRecorder::WriteData(
     void *obj, unsigned char *data, PRUint32 len, PRUint32 *wr)
 {
-    nsresult rv;
-    PRUint32 av;
-    char *decoded;
-    char *encoded;
-    PRBool success;
     MediaRecorder *mr = static_cast<MediaRecorder*>(obj);
-
-    if (mr->pipeStream) {
-        return mr->pipeStream->Write((const char*)data, len, wr);
-    }
-
-    if (mr->pipeSock) {
-        /* We're batching websocket writes every SOCK_LEN bytes */
-        mr->sockOut->Write((const char*)data, len, wr);
-
-        if (NS_SUCCEEDED(mr->sockIn->Available(&av)) && av >= SOCK_LEN) {
-            decoded = (char *)PR_Calloc(SOCK_LEN, 1);
-            rv = mr->sockIn->Read(decoded, SOCK_LEN, &av);
-
-            /* Base64 is ((srclen + 2)/3)*4 in size. We do this because
-             * websockets cannot send binary data (yet) */
-            encoded = PL_Base64Encode((const char*)decoded, SOCK_LEN, nsnull);
-            rv = mr->pipeSock->Send(NS_ConvertUTF8toUTF16(encoded), &success);
-
-            PR_Free(decoded);
-            PR_Free(encoded);
-            return rv;
-        }
-        return NS_OK;
-    }
-
-    return NS_ERROR_FAILURE;
+    return mr->pipeStream->Write((const char*)data, len, wr);
 }
 
 
@@ -306,9 +276,7 @@ MediaRecorder::Init()
 
     log = PR_NewLogModule("MediaRecorder");
 
-    pipeSock = nsnull;
     pipeStream = nsnull;
-
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
@@ -599,23 +567,6 @@ MediaRecorder::RecordToFile(
 }
 
 /*
- * Start recording to web socket
- */
-NS_IMETHODIMP
-MediaRecorder::RecordToSocket(
-    nsIPropertyBag2 *prop,
-    nsIDOMCanvasRenderingContext2D *ctx,
-    nsIWebSocket *sock
-)
-{
-    pipeSock = sock;
-    ParseProperties(prop);
-    MakePipe(getter_AddRefs(sockIn), getter_AddRefs(sockOut));
-
-    return Record(ctx);
-}
-
-/*
  * Parse and set properties
  */
 void
@@ -803,14 +754,7 @@ MediaRecorder::Stop()
     }
 
     /* GG */
-    if (pipeStream) {
-        pipeStream->Close();
-        pipeStream = nsnull;
-    }
-    if (pipeSock) {
-        pipeSock = nsnull;
-    }
-
+    pipeStream->Close();
     return NS_OK;
 }
 

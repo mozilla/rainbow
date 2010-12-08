@@ -49,9 +49,6 @@ interface IMediaRecorder : nsISupports
     void recordToStream(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
         in nsIOutputStream stream);
-    void recordToSocket(in nsIPropertyBag2 prop,
-        in nsIDOMCanvasRenderingContext2D ctx,
-        in nsIWebSocket sock);
     void stop();
 };
 

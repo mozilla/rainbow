@@ -136,9 +136,7 @@ protected:
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
 
-    nsCOMPtr<nsIWebSocket> pipeSock;
     nsCOMPtr<nsIOutputStream> pipeStream;
-
     nsCOMPtr<nsIAsyncInputStream> sockIn;
     nsCOMPtr<nsIAsyncOutputStream> sockOut;
 
