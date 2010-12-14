@@ -175,7 +175,7 @@ VideoSourceMac::Callback(
     /* Write to canvas, if needed */
     int fsize = vsm->width * vsm->height * 4;
     if (vsm->vCanvas) {
-        /* Convert RGB32 to i420 */
+        /* Convert i420 to RGB32 to write on canvas */
         nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[fsize]);
         I420toRGB32(vsm->width, vsm->height,
             (const char *)video->video_data, (char *)rgb32.get());

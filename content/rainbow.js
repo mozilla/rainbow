@@ -44,7 +44,7 @@ let Rainbow = {
     _recording: false,
 
     _makePropertyBag: function(prop) {
-        let bP = ["audio", "video"];
+        let bP = ["audio", "video", "source"];
         let iP = ["width", "height", "channels", "rate"];
         let dP = ["quality"];
 

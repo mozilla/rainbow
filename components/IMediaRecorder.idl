@@ -35,7 +35,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsILocalFile.idl"
-#include "nsIWebSocket.idl"
 #include "nsIOutputStream.idl"
 #include "nsIPropertyBag2.idl"
 #include "nsIDOMCanvasRenderingContext2D.idl"

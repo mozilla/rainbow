@@ -56,7 +56,8 @@ so_target = $(target:=.$(so))
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
     VideoSource.cpp $(os)/VideoSource$(teh).cpp \
-    AudioSource.cpp $(os)/AudioSource$(teh).cpp
+    AudioSource.cpp $(os)/AudioSource$(teh).cpp \
+    VideoSourceCanvas.cpp 
 
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl

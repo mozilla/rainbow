@@ -588,6 +588,8 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
     if (NS_FAILED(rv)) params->rate = SAMPLE_RATE;
     rv = prop->GetPropertyAsDouble(NS_LITERAL_STRING("quality"), &params->qual);
     if (NS_FAILED(rv)) params->qual = (double)SAMPLE_QUALITY;
+    rv = prop->GetPropertyAsBool(NS_LITERAL_STRING("source"), &params->canvas);
+    if (NS_FAILED(rv)) params->source = PR_FALSE;
 }
 
 /*
@@ -615,7 +617,12 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
     aState->backend = new AudioSourceNix(params->chan, params->rate);
     vState->backend = new VideoSourceNix(params->width, params->height);
     #endif
-
+ 
+    /* Is the given canvas source or destination? */
+    if (params->canvas) {
+        vState->backend = new VideoSourceCanvas(params->width, params->height);
+    }
+       
     /* Update parameters. What we asked for were just hints,
      * may not end up the same */
     params->fps_n = vState->backend->GetFPSN();

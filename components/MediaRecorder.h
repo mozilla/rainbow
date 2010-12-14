@@ -72,6 +72,8 @@
 #include "AudioSourceNix.h"
 #endif
 
+#include "VideoSourceCanvas.h"
+
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
 #define MEDIA_RECORDER_CID { 0xc467b1f4, 0x551c, 0x4e2f, \
@@ -107,7 +109,7 @@ typedef struct {
 
 typedef struct {
     double qual;
-    PRBool audio, video;
+    PRBool audio, video, source, canvas;
     PRUint32 fps_n, fps_d, width, height, rate, chan;
 } Properties;
 

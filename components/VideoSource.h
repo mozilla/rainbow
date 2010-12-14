@@ -35,6 +35,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#ifndef _VIDEOSOURCE_H
+#define _VIDEOSOURCE_H
 /*
  * Interface for video sources to implement
  * TODO: Figure out if and how to do device selection
@@ -114,4 +116,6 @@ private:
     PRUint32 m_pDataSize;
 
 };
+
+#endif
 
