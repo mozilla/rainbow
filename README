@@ -42,12 +42,20 @@ and 'ctx' is the 2D context of a canvas on which a live preview (if video was
 requested) will be drawn. 'ctx' may be null in case you do not want a preview.
 The record call will return an object, on which you can call stop() to end
 recording. It will return a DOM File object which you may then upload.
+Please see content/example.html for sample usage of the API.
 
-Rainbow 0.2 also offers preliminary support for sending multiplexed frames to a
-websocket. Since websockets do not support binary data (yet), Rainbow will
-write segments in Base64 encoding, 8192 bytes per message:
+Rainbow 0.3 also offer support for recording from a canvas as source (instead
+of a webcam). The canvas will be sampled the rate of 30 frames per second. You
+can do this by specifying the 'source' property of the params object to be
+'true'. This will treat the 'ctx' argument you pass to the recordToFile function
+as the source of video rather than the destinatin of a live preview. Please
+see content/example_canvas.html for an example of such usage.
 
-window.navigator.media.recordToSocket(params, ctx, sock);
+For the really bold, Rainbow 0.3 also comes with experimental support for 
+streaming to an Icecast server. See content/example_stream.html to see how this
+is done. You will have to configure your Icecast server to accept the username /
+password combination 'source:rainbow'. We have dropped support for writing
+streams to a websocket (since they will not be enabled by default in Firefox 4).
 
 ---------------
 Temporary Files
