@@ -9,7 +9,7 @@
     <id>rainbow@labs.mozilla</id>
 
     <name>Mozilla Labs: Rainbow</name>
-    <version>0.2</version>
+    <version>0.3</version>
 
     <!--<bootstrap>true</bootstrap>-->
     <unpack>true</unpack>
@@ -18,8 +18,8 @@
     <targetApplication>
       <r:Description>
         <id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
-        <minVersion>4.0b8pre</minVersion>
-        <maxVersion>4.0b8pre</maxVersion>
+        <minVersion>4.0b10</minVersion>
+        <maxVersion>4.0b11pre</maxVersion>
       </r:Description>
     </targetApplication>
   </r:Description>

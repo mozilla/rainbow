@@ -104,7 +104,8 @@ public:
 
     NS_IMETHOD Run() {
         return m_pCtx->PutImageData_explicit(
-            0, 0, m_width, m_height, m_pData.get(), m_pDataSize
+            0, 0, m_width, m_height, m_pData.get(), m_pDataSize,
+            PR_TRUE, 0, 0, m_width, m_height
         );
     }
 
