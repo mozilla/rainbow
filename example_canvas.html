@@ -1,0 +1,47 @@
+<html>
+<head>
+    <title>Rainbow!</title>
+    <script type="application/javascript;version=1.8">
+        let Me = window.navigator.service.media;
+    </script>
+    <script type="application/javascript"
+            src="http://www.blobsallad.se/blobsallad.js"></script>
+</head>
+<body onload="init();" style="margin:50px 0px;padding:0px;text-align:center;">
+    <h1>Canvas Recording Example</h1>
+    <canvas id="blob" width="640" height="480"></canvas>
+    <p><input type="button" id="tehbutton" value="Start!"/></p>
+    <p id="tehmsg"></p>
+    <input type="file" id="tehfile" style="display:none;"></input>
+</body>
+<script type="application/javascript;version=1.8">
+    let Sr, Fi;
+    let Re = false;
+    let msg = document.getElementById("tehmsg");
+    let fil = document.getElementById("tehfile");
+    let but = document.getElementById("tehbutton");
+    let ctx = document.getElementById("blob").getContext("2d");
+
+    but.onclick = function() {
+        if (Re) {
+            // Stop recording
+            Fi = Sr.stop();
+            Re = false;
+            but.value = "Start!";
+
+            msg.innerHTML = "Your video was named: " +
+                Fi.files.item(0).fileName + " and is " +
+                Fi.files.item(0).fileSize + " bytes big!";
+        } else {
+            // Start recording
+            Re = true;
+            but.value = "Stop!";
+            msg.innerHTML = " ";
+            Sr = Me.recordToFile({
+                "width": 640, "height": 480, "source": true
+            }, ctx);
+        }
+    }
+</script>
+</html>
+
