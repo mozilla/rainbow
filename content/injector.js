@@ -40,7 +40,10 @@ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://rainbow/content/rainbow.js");
 
 const PREFNAME = "allowedDomains";
-const DEFAULT_DOMAINS = ["http://localhost"];
+const DEFAULT_DOMAINS = [
+    "http://localhost",
+    "http://mozilla.github.com/rainbow"
+];
 
 let RainbowInjector = {
     SCRIPT_TO_INJECT_URI: "resource://rainbow/content/injected.js",

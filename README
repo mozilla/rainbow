@@ -17,6 +17,14 @@ We would ultimately not want to depend on any external libraries. QTKit
 backends for Video and Audio on the Mac, as well as a V4L backend for Video on
 Linux are under development.
 
+-------------
+Quick testing
+-------------
+We have setup test pages for Rainbow on http://mozilla.github.com/rainbow/
+which you can visit after you install the add-on. The domain has already been
+added to the default preference 'extensions.rainbow.allowedDomains', but
+you may want to double-check to make sure the examples will work.
+
 ---
 API
 ---
