@@ -42,7 +42,7 @@ Components.utils.import("resource://rainbow/content/rainbow.js");
 const PREFNAME = "allowedDomains";
 const DEFAULT_DOMAINS = [
     "http://localhost",
-    "http://mozilla.github.com/rainbow"
+    "http://mozilla.github.com"
 ];
 
 let RainbowInjector = {

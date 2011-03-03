@@ -23,7 +23,8 @@ Quick testing
 We have setup test pages for Rainbow on http://mozilla.github.com/rainbow/
 which you can visit after you install the add-on. The domain has already been
 added to the default preference 'extensions.rainbow.allowedDomains', but
-you may want to double-check to make sure the examples will work.
+if you are upgrading from an older version, please add 'http://mozilla.github.com'
+manually to the preference via about:config.
 
 ---
 API
@@ -87,7 +88,9 @@ Common Errors
 
 This usually means that a device to record audio or video was not found. If you
 look at the command line (stderr) you will find a clearer error message. We need
-to propogate this type of error correctly to JS.
+to propagate this type of error correctly to JS. Verify that your camera and
+microphone are working with a third party application and re-run the examples
+with either audio or video disabled.
 
 "Error: window.navigator.service is undefined"
 

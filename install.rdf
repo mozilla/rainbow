@@ -9,7 +9,7 @@
     <id>rainbow@labs.mozilla</id>
 
     <name>Mozilla Labs: Rainbow</name>
-    <version>0.3</version>
+    <version>0.3.1</version>
 
     <!--<bootstrap>true</bootstrap>-->
     <unpack>true</unpack>
