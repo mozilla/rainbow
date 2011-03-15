@@ -36,8 +36,10 @@
 
 let EXPORTED_SYMBOLS = ["Rainbow"];
 
+const Cu = Components.utils;
 const Cc = Components.classes;
 const Ci = Components.interfaces;
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 let Rainbow = {
     _input: null,
@@ -67,7 +69,7 @@ let Rainbow = {
         return bag;
     },
 
-    recordToFile: function(prop, ctx) {
+    recordToFile: function(prop, ctx, obs) {
         if (Rainbow._recording)
             throw "Recording already in progress";
 
@@ -85,37 +87,12 @@ let Rainbow = {
         Rainbow._input = doc.createElement('input');
         Rainbow._input.type = 'file';
         Rainbow._input.mozSetFileNameArray([file.path], 1);
-
+        
         // Start recording
         Cc["@labs.mozilla.com/media/recorder;1"].
-            getService(Ci.IMediaRecorder).recordToFile(bag, ctx, file);
-        
-        Rainbow._recording = true;
-    },
-
-    recordToStream: function(prop, ctx, host, port) {
-        if (Rainbow._recording)
-            throw "Recording already in progress";
-
-        let bag = Rainbow._makePropertyBag(prop);
-        let tra = Cc["@mozilla.org/network/socket-transport-service;1"].
-            getService(Ci.nsISocketTransportService);
-
-        let sck = tra.createTransport(null, 0, host, port, null);
-        let str = sck.openOutputStream(0, 0, 0);
-
-        Cc["@labs.mozilla.com/media/recorder;1"].
-            getService(Ci.IMediaRecorder).recordToStream(bag, ctx, str);
-        Rainbow._recording = true;
-    },
-
-    recordToSocket: function(prop, ctx, sock) {
-        if (Rainbow._recording)
-            throw "Recording already in progress";
-
-        let bag = Rainbow._makePropertyBag(prop);
-        Cc["@labs.mozilla.com/media/recorder;1"].
-            getService(Ci.IMediaRecorder).recordToSocket(bag, ctx, sock);
+            getService(Ci.IMediaRecorder).recordToFile(
+                bag, ctx, file, obs
+            );
         
         Rainbow._recording = true;
     },

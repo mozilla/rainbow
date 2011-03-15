@@ -26,6 +26,10 @@
         ctx.drawImage(img, 192, 112);
     }
 
+    function onStateChange(type, arg) {
+        msg.innerHTML = type + " :: " + arg;
+    }
+    
     but.onclick = function() {
         if (Re) {
             // Stop recording
@@ -43,7 +47,7 @@
             Re = true;
             but.value = "Stop!";
             msg.innerHTML = " ";
-            Sr = Me.recordToFile({}, ctx);
+            Sr = Me.recordToFile({}, ctx, onStateChange);
         }
     }
 </script>

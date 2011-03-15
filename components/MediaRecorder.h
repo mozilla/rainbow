@@ -128,30 +128,32 @@ protected:
     Audio *aState;
     Video *vState;
 
-    PRThread *encoder;
+    PRThread *thread;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
-
-    nsresult SetupTheoraBOS();
-    nsresult SetupVorbisBOS();
-    nsresult SetupTheoraHeaders();
-    nsresult SetupVorbisHeaders();
-
+    nsIDOMCanvasRenderingContext2D *canvas;
+    
     nsCOMPtr<nsIOutputStream> pipeStream;
     nsCOMPtr<nsIAsyncInputStream> sockIn;
     nsCOMPtr<nsIAsyncOutputStream> sockOut;
-
+    nsCOMPtr<nsIMediaStateObserver> observer;
+    
     static MediaRecorder *gMediaRecordingService;
 
     static void Encode(void *data);
+    static void Record(void *data);
+    static void StopRecord(void *data);
     static void WriteAudio(void *data);
     static nsresult WriteData(
         void *obj, unsigned char *data, PRUint32 len, PRUint32 *wr
     );
 
+    nsresult SetupTheoraBOS();
+    nsresult SetupVorbisBOS();
+    nsresult SetupTheoraHeaders();
+    nsresult SetupVorbisHeaders();
     void ParseProperties(nsIPropertyBag2 *prop);
-    nsresult Record(nsIDOMCanvasRenderingContext2D *ctx);
     nsresult MakePipe(nsIAsyncInputStream **in, nsIAsyncOutputStream **out);
 
 private:

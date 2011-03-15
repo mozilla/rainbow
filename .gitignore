@@ -1,1 +1,4 @@
 *.swp
+*.o
+*.dylib
+.DS_Store

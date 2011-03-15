@@ -104,7 +104,8 @@ MediaRecorder::WriteData(
 
 
 /*
- * Encoder, runs in a thread
+ * Encoder. Runs in a loop off the record thread until we run out of frames
+ * (probably because stop was called)
  */
 void
 MediaRecorder::Encode(void *data)
@@ -504,32 +505,6 @@ MediaRecorder::MakePipe(nsIAsyncInputStream **in,
 }
 
 /*
- * Start recording to file
- */
-NS_IMETHODIMP
-MediaRecorder::RecordToFile(
-    nsIPropertyBag2 *prop,
-    nsIDOMCanvasRenderingContext2D *ctx,
-    nsILocalFile *file
-)
-{
-    nsresult rv;
-    ParseProperties(prop);
-
-    /* Get a file stream from the local file */
-    nsCOMPtr<nsIFileOutputStream> stream(
-        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
-    );
-
-    pipeStream = do_QueryInterface(stream, &rv);
-    if (NS_FAILED(rv)) return rv;
-    rv = stream->Init(file, -1, -1, 0);
-    if (NS_FAILED(rv)) return rv;
-
-    return Record(ctx);
-}
-
-/*
  * Parse and set properties
  */
 void
@@ -556,102 +531,146 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
 }
 
 /*
- * Actual record method
+ * Start recording to file
  */
-nsresult
-MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
-{   
+NS_IMETHODIMP
+MediaRecorder::RecordToFile(
+    nsIPropertyBag2 *prop,
+    nsIDOMCanvasRenderingContext2D *ctx,
+    nsILocalFile *file,
+    nsIMediaStateObserver *obs
+)
+{
     nsresult rv;
-    if (a_rec || v_rec) {
-        PR_LOG(log, PR_LOG_NOTICE, ("Recording in progress\n"));
-        return NS_ERROR_FAILURE;
-    }
+    ParseProperties(prop);
 
-    /* Setup backends */
-    #ifdef RAINBOW_Mac
-    aState->backend = new AudioSourceMac(params->chan, params->rate);
-    vState->backend = new VideoSourceMac(params->width, params->height);
-    #endif
-    #ifdef RAINBOW_Win
-    aState->backend = new AudioSourceWin(params->chan, params->rate);
-    vState->backend = new VideoSourceWin(params->width, params->height);
-    #endif
-    #ifdef RAINBOW_Nix
-    aState->backend = new AudioSourceNix(params->chan, params->rate);
-    vState->backend = new VideoSourceNix(params->width, params->height);
-    #endif
- 
-    /* Is the given canvas source or destination? */
-    if (params->canvas) {
-        vState->backend = new VideoSourceCanvas(params->width, params->height);
-    }
-       
-    /* Update parameters. What we asked for were just hints,
-     * may not end up the same */
-    params->fps_n = vState->backend->GetFPSN();
-    params->fps_d = vState->backend->GetFPSD();
-    params->rate = aState->backend->GetRate();
-    params->chan = aState->backend->GetChannels();
+    /* Get a file stream from the local file */
+    canvas = ctx;
+    observer = obs;
+    nsCOMPtr<nsIFileOutputStream> stream(
+        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
+    );
 
-    /* FIXME: device detection TBD */
-    if (params->audio && (aState == nsnull)) {
-        PR_LOG(log, PR_LOG_NOTICE, ("Audio requested but no devices found\n"));
-        return NS_ERROR_FAILURE;
-    }
-    if (params->video && (vState == nsnull)) {
-        PR_LOG(log, PR_LOG_NOTICE, ("Video requested but no devices found\n"));
-        return NS_ERROR_FAILURE;
-    }
+    pipeStream = do_QueryInterface(stream, &rv);
+    if (NS_FAILED(rv)) return rv;
+    rv = stream->Init(file, -1, -1, 0);
+    if (NS_FAILED(rv)) return rv;
 
-    /* Get ready for video! */
-    if (params->video) {
-        SetupTheoraBOS();
-        rv = MakePipe(
-            getter_AddRefs(vState->vPipeIn),
-            getter_AddRefs(vState->vPipeOut)
-        );
-        if (NS_FAILED(rv)) return rv;
-    }
-
-    /* Get ready for audio! */
-    if (params->audio) {
-        SetupVorbisBOS();
-        rv = MakePipe(
-            getter_AddRefs(aState->aPipeIn),
-            getter_AddRefs(aState->aPipeOut)
-        );
-        if (NS_FAILED(rv)) return rv;
-    }
-
-    /* Let's DO this. */
-    if (params->video) {
-        SetupTheoraHeaders();
-        rv = vState->backend->Start(vState->vPipeOut, ctx);
-        if (NS_FAILED(rv)) return rv;
-        v_rec = PR_TRUE;
-        v_stp = PR_FALSE;
-    }
-    if (params->audio) {
-        SetupVorbisHeaders();
-        rv = aState->backend->Start(aState->aPipeOut);
-        if (NS_FAILED(rv)) {
-            /* FIXME: Stop and clean up video! */
-            return rv;
-        }
-        a_rec = PR_TRUE;
-        a_stp = PR_FALSE;
-    }
-
-    /* Encode thread */
-    encoder = PR_CreateThread(
+    thread = PR_CreateThread(
         PR_SYSTEM_THREAD,
-        MediaRecorder::Encode, this,
+        MediaRecorder::Record, this,
         PR_PRIORITY_NORMAL,
         PR_GLOBAL_THREAD,
         PR_JOINABLE_THREAD, 0
     );
-
+    
     return NS_OK;
+}
+
+/*
+ * Start recording (called in a thread)
+ */
+void
+MediaRecorder::Record(void *data)
+{   
+    nsresult rv;
+    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
+    Properties *params = mr->params;
+    
+    if (mr->a_rec || mr->v_rec) {
+        mr->observer->OnStateChange("error", "recording already in progress");
+        return;
+    }
+
+    /* Setup backends */
+    #ifdef RAINBOW_Mac
+    mr->aState->backend = new AudioSourceMac(params->chan, params->rate);
+    mr->vState->backend = new VideoSourceMac(params->width, params->height);
+    #endif
+    #ifdef RAINBOW_Win
+    mr->aState->backend = new AudioSourceWin(params->chan, params->rate);
+    mr->vState->backend = new VideoSourceWin(params->width, params->height);
+    #endif
+    #ifdef RAINBOW_Nix
+    mr->aState->backend = new AudioSourceNix(params->chan, params->rate);
+    mr->vState->backend = new VideoSourceNix(params->width, params->height);
+    #endif
+ 
+    /* Is the given canvas source or destination? */
+    if (params->canvas) {
+        mr->vState->backend = new VideoSourceCanvas(params->width, params->height);
+    }
+       
+    /* Update parameters. What we asked for were just hints,
+     * may not end up the same */
+    params->fps_n = mr->vState->backend->GetFPSN();
+    params->fps_d = mr->vState->backend->GetFPSD();
+    params->rate = mr->aState->backend->GetRate();
+    params->chan = mr->aState->backend->GetChannels();
+
+    /* FIXME: device detection TBD */
+    if (params->audio && (mr->aState == nsnull)) {
+        mr->observer->OnStateChange("error", "audio requested but no devices found");
+        return;
+    }
+    if (params->video && (mr->vState == nsnull)) {
+        mr->observer->OnStateChange("error", "video requested but no devices found");
+        return;
+    }
+
+    /* Get ready for video! */
+    if (params->video) {
+        mr->SetupTheoraBOS();
+        rv = mr->MakePipe(
+            getter_AddRefs(mr->vState->vPipeIn),
+            getter_AddRefs(mr->vState->vPipeOut)
+        );
+        if (NS_FAILED(rv)) {
+            mr->observer->OnStateChange("error", "internal: could not create video pipe");
+            return;
+        }
+    }
+
+    /* Get ready for audio! */
+    if (params->audio) {
+        mr->SetupVorbisBOS();
+        rv = mr->MakePipe(
+            getter_AddRefs(mr->aState->aPipeIn),
+            getter_AddRefs(mr->aState->aPipeOut)
+        );
+        if (NS_FAILED(rv)) {
+            mr->observer->OnStateChange("error", "internal: could not create audio pipe");
+            return;
+        }
+    }
+
+    /* Let's DO this. */
+    if (params->video) {
+        mr->SetupTheoraHeaders();
+        rv = mr->vState->backend->Start(mr->vState->vPipeOut, mr->canvas);
+        if (NS_FAILED(rv)) {
+            mr->observer->OnStateChange("error", "internal: could not start video recording");
+            return;
+        }
+        mr->v_rec = PR_TRUE;
+        mr->v_stp = PR_FALSE;
+    }
+    if (params->audio) {
+        mr->SetupVorbisHeaders();
+        rv = mr->aState->backend->Start(mr->aState->aPipeOut);
+        if (NS_FAILED(rv)) {
+            /* FIXME: Stop and clean up video! */
+            mr->observer->OnStateChange("error", "internal: could not start video recording");
+            return;
+        }
+        mr->a_rec = PR_TRUE;
+        mr->a_stp = PR_FALSE;
+    }
+
+    /* Start off encoder after notifying observer */
+    mr->observer->OnStateChange("started", "");
+    mr->Encode(data);
+    return;
 }
 
 /*
@@ -660,71 +679,95 @@ MediaRecorder::Record(nsIDOMCanvasRenderingContext2D *ctx)
 NS_IMETHODIMP
 MediaRecorder::Stop()
 {
-    nsresult rv;
-    PRUint32 wr;
-
     if (!a_rec && !v_rec) {
-        PR_LOG(log, PR_LOG_NOTICE, ("No recording in progress\n"));
+        observer->OnStateChange("error", "no recording in progress");
         return NS_ERROR_FAILURE;
     }
 
-    if (v_rec) {
-        rv = vState->backend->Stop();
-        if (NS_FAILED(rv)) return rv;
+    /* Return quickly and actually stop in a thread, notifying caller via
+     * the 'observer' */
+    PR_CreateThread(
+        PR_SYSTEM_THREAD,
+        MediaRecorder::StopRecord, this,
+        PR_PRIORITY_NORMAL,
+        PR_GLOBAL_THREAD,
+        PR_JOINABLE_THREAD, 0
+    );
+    
+    return NS_OK;
+}
+
+void
+MediaRecorder::StopRecord(void *data)
+{
+    nsresult rv;
+    PRUint32 wr;
+    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
+    
+    if (mr->v_rec) {
+        rv = mr->vState->backend->Stop();
+        if (NS_FAILED(rv)) {
+            mr->observer->OnStateChange("error", "could not stop video recording");
+            return;
+        }
     }
 
-    if (a_rec) {
-        rv = aState->backend->Stop();
-        if (NS_FAILED(rv)) return rv;
+    if (mr->a_rec) {
+        rv = mr->aState->backend->Stop();
+        if (NS_FAILED(rv)) {
+            mr->observer->OnStateChange("error", "could not stop audio recording");
+            return;
+        }
     }
 
     /* Wait for encoder to finish */
-    if (v_rec) {
-        v_stp = PR_TRUE;
-        vState->vPipeOut->Close();
+    if (mr->v_rec) {
+        mr->v_stp = PR_TRUE;
+        mr->vState->vPipeOut->Close();
     }
-    if (a_rec) {
-        a_stp = PR_TRUE;
-        aState->aPipeOut->Close();
+    if (mr->a_rec) {
+        mr->a_stp = PR_TRUE;
+        mr->aState->aPipeOut->Close();
     }
 
-    PR_JoinThread(encoder);
+    PR_JoinThread(mr->thread);
 
-    if (v_rec) {
-        vState->vPipeIn->Close();
-        th_encode_free(vState->th);
+    if (mr->v_rec) {
+        mr->vState->vPipeIn->Close();
+        th_encode_free(mr->vState->th);
 
         /* Video trailer */
-        if (ogg_stream_flush(&vState->os, &vState->og)) {
+        if (ogg_stream_flush(&mr->vState->os, &mr->vState->og)) {
             rv = WriteData(
-                this, vState->og.header, vState->og.header_len, &wr
+                mr, mr->vState->og.header, mr->vState->og.header_len, &wr
             );
             rv = WriteData(
-                this, vState->og.body, vState->og.body_len, &wr
+                mr, mr->vState->og.body, mr->vState->og.body_len, &wr
             );
         }
 
-        ogg_stream_clear(&vState->os);
-        v_rec = PR_FALSE;
+        ogg_stream_clear(&mr->vState->os);
+        mr->v_rec = PR_FALSE;
     }
 
-    if (a_rec) {
-        aState->aPipeIn->Close();
+    if (mr->a_rec) {
+        mr->aState->aPipeIn->Close();
 
         /* Audio trailer */
-        vorbis_analysis_wrote(&aState->vd, 0);
-        MediaRecorder::WriteAudio(this);
+        vorbis_analysis_wrote(&mr->aState->vd, 0);
+        MediaRecorder::WriteAudio(mr);
 
-        vorbis_block_clear(&aState->vb);
-        vorbis_dsp_clear(&aState->vd);
-        vorbis_comment_clear(&aState->vc);
-        vorbis_info_clear(&aState->vi);
-        ogg_stream_clear(&aState->os);
-        a_rec = PR_FALSE;
+        vorbis_block_clear(&mr->aState->vb);
+        vorbis_dsp_clear(&mr->aState->vd);
+        vorbis_comment_clear(&mr->aState->vc);
+        vorbis_info_clear(&mr->aState->vi);
+        ogg_stream_clear(&mr->aState->os);
+        mr->a_rec = PR_FALSE;
     }
 
     /* GG */
-    pipeStream->Close();
-    return NS_OK;
+    mr->pipeStream->Close();
+    mr->observer->OnStateChange("stopped", "");
+    return;
 }
 

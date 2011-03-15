@@ -80,9 +80,7 @@ let RainbowInjector = {
         sandbox.window = win.wrappedJSObject;
 
         sandbox.importFunction(Rainbow.stop, "recStop");
-        sandbox.importFunction(Rainbow.recordToFile, "recFStart");
-        sandbox.importFunction(Rainbow.recordToSocket, "recSStart");
-        sandbox.importFunction(Rainbow.recordToStream, "recTStart");
+        sandbox.importFunction(Rainbow.recordToFile, "recStart");
 
         Components.utils.evalInSandbox(
             this._toInject, sandbox, "1.8", this.SCRIPT_TO_INJECT_URI, 1

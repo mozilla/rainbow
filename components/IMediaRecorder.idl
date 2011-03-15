@@ -39,12 +39,17 @@
 #include "nsIPropertyBag2.idl"
 #include "nsIDOMCanvasRenderingContext2D.idl"
 
+[scriptable, function, uuid(9d66a225-0134-4c6f-a6e2-466c899bdde4)]
+interface nsIMediaStateObserver : nsISupports
+{
+    void onStateChange(in string state, in string args);
+};
+
 [scriptable, uuid(c467b1f4-551c-4e2f-a6ba-cb7d792d1452)]
 interface IMediaRecorder : nsISupports
 {
     void recordToFile(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
-        in nsILocalFile file);
+        in nsILocalFile file, in nsIMediaStateObserver obs);
     void stop();
 };
-
