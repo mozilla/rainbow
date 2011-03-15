@@ -51,8 +51,8 @@
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 /* Defaults */
-#define FPS_N   30000
-#define FPS_D   1001
+#define FPS_N   15000
+#define FPS_D   1000
 #define WIDTH   640
 #define HEIGHT  480
 

@@ -45,9 +45,6 @@ interface IMediaRecorder : nsISupports
     void recordToFile(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
         in nsILocalFile file);
-    void recordToStream(in nsIPropertyBag2 prop,
-        in nsIDOMCanvasRenderingContext2D ctx,
-        in nsIOutputStream stream);
     void stop();
 };
 
