@@ -27,7 +27,17 @@
     }
 
     function onStateChange(type, arg) {
-        msg.innerHTML = type + " :: " + arg;
+        switch (type) {
+            case "started":
+                msg.innerHTML = "Recording has begun!";
+                break;
+            case "stopped":
+                // Recording stopped, message is displayed by onclick code
+                break;
+            case "error":
+                msg.innerHTML = "There was an error :( " + type + " :: " + arg;
+                break;
+        }
     }
     
     but.onclick = function() {
@@ -46,7 +56,7 @@
             // Start recording
             Re = true;
             but.value = "Stop!";
-            msg.innerHTML = " ";
+            msg.innerHTML = "Loading...";
             Sr = Me.recordToFile({}, ctx, onStateChange);
         }
     }

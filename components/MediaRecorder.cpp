@@ -55,6 +55,25 @@ MediaRecorder::GetSingleton()
     return gMediaRecordingService;
 }
 
+/*
+ * Special runnable object to dispatch JS callback on main thread
+ */
+class MediaCallback : public nsRunnable {
+public:
+    MediaCallback(nsIMediaStateObserver *obs, const char *msg, const char *arg) {
+        m_Obs = obs;
+        strcpy(m_Msg, msg);
+        strcpy(m_Arg, arg);
+    }
+    
+    NS_IMETHOD Run() {
+        return m_Obs->OnStateChange((char *)m_Msg, (char *)m_Arg);
+    }
+    
+private:
+    nsIMediaStateObserver *m_Obs;
+    char m_Msg[128]; char m_Arg[256];
+};
 
 /*
  * === Here's the meat of the code. Static callbacks & encoder ===
@@ -543,14 +562,14 @@ MediaRecorder::RecordToFile(
 {
     nsresult rv;
     ParseProperties(prop);
-
-    /* Get a file stream from the local file */
+    
     canvas = ctx;
     observer = obs;
+    
+    /* Get a file stream from the local file */
     nsCOMPtr<nsIFileOutputStream> stream(
         do_CreateInstance("@mozilla.org/network/file-output-stream;1")
     );
-
     pipeStream = do_QueryInterface(stream, &rv);
     if (NS_FAILED(rv)) return rv;
     rv = stream->Init(file, -1, -1, 0);
@@ -578,7 +597,9 @@ MediaRecorder::Record(void *data)
     Properties *params = mr->params;
     
     if (mr->a_rec || mr->v_rec) {
-        mr->observer->OnStateChange("error", "recording already in progress");
+        NS_DispatchToMainThread(new MediaCallback(
+            mr->observer, "error", "recording already in progress"
+        ));
         return;
     }
 
@@ -610,11 +631,15 @@ MediaRecorder::Record(void *data)
 
     /* FIXME: device detection TBD */
     if (params->audio && (mr->aState == nsnull)) {
-        mr->observer->OnStateChange("error", "audio requested but no devices found");
+        NS_DispatchToMainThread(new MediaCallback(
+            mr->observer, "error", "audio requested but no devices found"
+        ));
         return;
     }
     if (params->video && (mr->vState == nsnull)) {
-        mr->observer->OnStateChange("error", "video requested but no devices found");
+        NS_DispatchToMainThread(new MediaCallback(
+            mr->observer, "error", "video requested but no devices found"
+        ));
         return;
     }
 
@@ -626,7 +651,9 @@ MediaRecorder::Record(void *data)
             getter_AddRefs(mr->vState->vPipeOut)
         );
         if (NS_FAILED(rv)) {
-            mr->observer->OnStateChange("error", "internal: could not create video pipe");
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not create video pipe"
+            ));
             return;
         }
     }
@@ -639,7 +666,9 @@ MediaRecorder::Record(void *data)
             getter_AddRefs(mr->aState->aPipeOut)
         );
         if (NS_FAILED(rv)) {
-            mr->observer->OnStateChange("error", "internal: could not create audio pipe");
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not create audio pipe"
+            ));
             return;
         }
     }
@@ -649,7 +678,9 @@ MediaRecorder::Record(void *data)
         mr->SetupTheoraHeaders();
         rv = mr->vState->backend->Start(mr->vState->vPipeOut, mr->canvas);
         if (NS_FAILED(rv)) {
-            mr->observer->OnStateChange("error", "internal: could not start video recording");
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not start video recording"
+            ));
             return;
         }
         mr->v_rec = PR_TRUE;
@@ -660,7 +691,9 @@ MediaRecorder::Record(void *data)
         rv = mr->aState->backend->Start(mr->aState->aPipeOut);
         if (NS_FAILED(rv)) {
             /* FIXME: Stop and clean up video! */
-            mr->observer->OnStateChange("error", "internal: could not start video recording");
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not start audio recording"
+            ));
             return;
         }
         mr->a_rec = PR_TRUE;
@@ -668,7 +701,9 @@ MediaRecorder::Record(void *data)
     }
 
     /* Start off encoder after notifying observer */
-    mr->observer->OnStateChange("started", "");
+    NS_DispatchToMainThread(new MediaCallback(
+        mr->observer, "started", ""
+    ));
     mr->Encode(data);
     return;
 }
@@ -680,7 +715,9 @@ NS_IMETHODIMP
 MediaRecorder::Stop()
 {
     if (!a_rec && !v_rec) {
-        observer->OnStateChange("error", "no recording in progress");
+        NS_DispatchToMainThread(new MediaCallback(
+            observer, "error", "no recording in progress"
+        ));
         return NS_ERROR_FAILURE;
     }
 
@@ -707,7 +744,9 @@ MediaRecorder::StopRecord(void *data)
     if (mr->v_rec) {
         rv = mr->vState->backend->Stop();
         if (NS_FAILED(rv)) {
-            mr->observer->OnStateChange("error", "could not stop video recording");
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "could not stop video recording"
+            ));
             return;
         }
     }
@@ -715,7 +754,9 @@ MediaRecorder::StopRecord(void *data)
     if (mr->a_rec) {
         rv = mr->aState->backend->Stop();
         if (NS_FAILED(rv)) {
-            mr->observer->OnStateChange("error", "could not stop audio recording");
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "could not stop audio recording"
+            ));
             return;
         }
     }
@@ -767,7 +808,8 @@ MediaRecorder::StopRecord(void *data)
 
     /* GG */
     mr->pipeStream->Close();
-    mr->observer->OnStateChange("stopped", "");
+    NS_DispatchToMainThread(new MediaCallback(
+        mr->observer, "stopped", ""
+    ));
     return;
 }
-

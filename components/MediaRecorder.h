@@ -47,16 +47,16 @@
 #include <plbase64.h>
 #include <prthread.h>
 
-#include <nsCOMPtr.h>
-#include <nsAutoPtr.h>
-#include <nsStringAPI.h>
-
 #include <nsIPipe.h>
 #include <nsIFileStreams.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
-#include <nsComponentManagerUtils.h>
 #include <nsIDOMCanvasRenderingContext2D.h>
+
+#include <nsCOMPtr.h>
+#include <nsAutoPtr.h>
+#include <nsStringAPI.h>
+#include <nsComponentManagerUtils.h>
 
 /* ifdefs are evil, but I am powerless. This is better than factory classes! */
 #ifdef RAINBOW_Mac
@@ -158,7 +158,6 @@ protected:
 
 private:
     Properties *params;
-
 };
 
 #endif
