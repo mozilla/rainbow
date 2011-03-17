@@ -141,18 +141,20 @@ protected:
     
     static MediaRecorder *gMediaRecordingService;
 
-    static void Encode(void *data);
     static void Record(void *data);
     static void StopRecord(void *data);
-    static void WriteAudio(void *data);
-    static nsresult WriteData(
-        void *obj, unsigned char *data, PRUint32 len, PRUint32 *wr
-    );
 
     nsresult SetupTheoraBOS();
     nsresult SetupVorbisBOS();
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
+    
+    void Encode();
+    void WriteAudio();
+    PRBool EncodeVideo(int length);
+    PRBool EncodeAudio(int length);
+    nsresult WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr);
+    
     void ParseProperties(nsIPropertyBag2 *prop);
     nsresult MakePipe(nsIAsyncInputStream **in, nsIAsyncOutputStream **out);
 

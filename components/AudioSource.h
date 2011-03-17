@@ -68,7 +68,6 @@ protected:
     /* You MUST set these two values in the constructor! */
     int rate;
     int channels;
-
     PRLogModuleInfo *log;
 
 };

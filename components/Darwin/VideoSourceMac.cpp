@@ -97,8 +97,8 @@ VideoSourceMac::VideoSourceMac(int w, int h)
     fmt_info.width = width;
     fmt_info.height = height;
     fmt_info.fourcc = VIDCAP_FOURCC_I420;
-    fps_n = fmt_info.fps_numerator;
-    fps_d = fmt_info.fps_denominator;
+    fps_n = fmt_info.fps_numerator = FPS_N;
+    fps_d = fmt_info.fps_denominator = FPS_D;
     
     if (vidcap_format_bind(source, &fmt_info)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_format_bind\n"));
@@ -167,12 +167,23 @@ VideoSourceMac::Callback(
     PRUint32 wr;
     VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
 
-    /* Write to pipe */
+    /* Write header: timestamp + length */
+    rv = vsm->output->Write(
+        (const char *)&video->capture_time_sec, sizeof(PRInt32), &wr
+    );
+    rv = vsm->output->Write(
+        (const char *)&video->capture_time_usec, sizeof(PRInt32), &wr
+    );
+    rv = vsm->output->Write(
+        (const char *)&video->video_data_size, sizeof(PRUint32), &wr
+    );
+    
+    /* Write data */
     rv = vsm->output->Write(
         (const char *)video->video_data, video->video_data_size, &wr
     );
 
-    /* Write to canvas, if needed */
+    /* Write preview to canvas, if needed */
     int fsize = vsm->width * vsm->height * 4;
     if (vsm->vCanvas) {
         /* Convert i420 to RGB32 to write on canvas */
