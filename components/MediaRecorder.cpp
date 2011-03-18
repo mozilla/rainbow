@@ -111,100 +111,112 @@ MediaRecorder::WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr)
 }
 
 /*
- * Encode length bytes of audio from incoming stream
+ * Get an audio packet from the pipe.
+ */
+PRInt16 *
+MediaRecorder::GetAudioPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
+{
+    nsresult rv;
+    PRUint32 rd;
+    PRInt16 *a_frames;
+    
+    /* Get audio frame header */
+    rv = aState->aPipeIn->Read((char *)time_s, sizeof(PRInt32), &rd);
+    rv = aState->aPipeIn->Read((char *)time_us, sizeof(PRInt32), &rd);
+    rv = aState->aPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
+    fprintf(stderr, "Got audio frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
+    
+    a_frames = (PRInt16 *) PR_Calloc(*len, sizeof(PRUint8));
+    do aState->aPipeIn->Available(&rd);
+        while ((rd < (PRUint32)*len) && !a_stp);
+    rv = aState->aPipeIn->Read((char *)a_frames, *len, &rd);
+    
+    if (rd == 0) {
+        /* EOF. We're done. */
+        PR_Free(a_frames);
+        return NULL;
+    } else if (rd != (PRUint32)*len) {
+        /* Hmm. I sure hope this is the end of the recording. */
+        if (!a_stp) {
+            PR_LOG(mr->log, PR_LOG_NOTICE,
+                ("only read %u of %d from audio pipe\n", rd, *len));
+        }
+        PR_Free(a_frames);
+        return NULL;
+    }
+    
+    return a_frames;
+}
+
+/*
+ * Encode length bytes of audio from the packet into Ogg stream
  */
 PRBool
-MediaRecorder::EncodeAudio(int length)
+MediaRecorder::EncodeAudio(PRInt16 *a_frames, int len)
 {
     int i, j, n;
-    nsresult rv;
-    PRInt16 *a_frame;
     float **a_buffer;
-    
-    PRUint32 rd, pkt_len;
-    PRInt32 time_s, time_us, done = 0;
 
-    int size = aState->backend->GetFrameSize();
-    while (done < length) {
-        /* Get audio frame header */
-        rv = aState->aPipeIn->Read((char *)&time_s, sizeof(PRInt32), &rd);
-        rv = aState->aPipeIn->Read((char *)&time_us, sizeof(PRInt32), &rd);
-        rv = aState->aPipeIn->Read((char *)&pkt_len, sizeof(PRUint32), &rd);
-        fprintf(stderr, "Got audio frame for %d bytes at %d :: %d\n", pkt_len, time_s, time_us);
-        
-        a_frame = (PRInt16 *) PR_Calloc(pkt_len, sizeof(PRUint8));
-        do aState->aPipeIn->Available(&rd);
-            while ((rd < (PRUint32)pkt_len) && !a_stp);
-        rv = aState->aPipeIn->Read((char *)a_frame, pkt_len, &rd);
-        done += rd;
-        
-        if (rd == 0) {
-            /* EOF. We're done. */
-            PR_Free(a_frame);
-            return PR_FALSE;
-        } else if (rd != (PRUint32)pkt_len) {
-            /* Hmm. I sure hope this is the end of the recording. */
-            PR_Free(a_frame);
-            if (!a_stp) {
-                PR_LOG(mr->log, PR_LOG_NOTICE,
-                    ("only read %u of %d from audio pipe\n", rd, pkt_len));
-            }
-            return PR_FALSE;
+    /* Uninterleave samples */
+    n = len / aState->backend->GetFrameSize();
+    a_buffer = vorbis_analysis_buffer(&aState->vd, n);
+    for (i = 0; i < n; i++){
+        for (j = 0; j < (int)params->chan; j++) {
+            a_buffer[j][i] = (float)((float)a_frames[i+j] / 32768.f);
         }
-
-        /* Uninterleave samples */
-        n = pkt_len / size;
-        a_buffer = vorbis_analysis_buffer(&aState->vd, n);
-        for (i = 0; i < n; i++){
-            for (j = 0; j < (int)params->chan; j++) {
-                a_buffer[j][i] = (float)((float)a_frame[i+j] / 32768.f);
-            }
-        }
-
-        /* Tell libvorbis to do its thing */
-        vorbis_analysis_wrote(&aState->vd, n);
-        WriteAudio();
-        PR_Free(a_frame);
     }
+
+    /* Tell libvorbis to do its thing */
+    vorbis_analysis_wrote(&aState->vd, n);
+    WriteAudio();
+    PR_Free(a_frames);
     
     return PR_TRUE;
 }
 
-PRBool
-MediaRecorder::EncodeVideo(int length)
+/*
+ * Get an audio packet from the pipe.
+ */
+PRUint8 *
+MediaRecorder::GetVideoPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
 {
     nsresult rv;
+    PRUint32 rd;
     PRUint8 *v_frame;
-    th_ycbcr_buffer v_buffer;
-    
-    PRUint32 wr, rd, pkt_len;
-    PRInt32 time_s, time_us;
     
     /* Get video frame header */
-    rv = vState->vPipeIn->Read((char *)&time_s, sizeof(PRInt32), &rd);
-    rv = vState->vPipeIn->Read((char *)&time_us, sizeof(PRInt32), &rd);
-    rv = vState->vPipeIn->Read((char *)&pkt_len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got video frame for %d bytes at %d :: %d\n", pkt_len, time_s, time_us);
+    rv = vState->vPipeIn->Read((char *)time_s, sizeof(PRInt32), &rd);
+    rv = vState->vPipeIn->Read((char *)time_us, sizeof(PRInt32), &rd);
+    rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
+    fprintf(stderr, "Got video frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
     
-    if (pkt_len != (PRUint32)length) {
-        fprintf(stderr, "INTERNAL ERROR: pipe packet did not contain 1 video frame exactly but %d\n", pkt_len);
-        return PR_FALSE;
-    }
-    
-    v_frame = (PRUint8 *)PR_Calloc(length, sizeof(PRUint8));
+    v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);
-        while ((rd < (PRUint32)length) && !v_stp);
-    rv = vState->vPipeIn->Read((char *)v_frame, length, &rd);
-
+        while ((rd < (PRUint32)*len) && !v_stp);
+    rv = vState->vPipeIn->Read((char *)v_frame, *len, &rd);
+    
     if (rd == 0) {
         PR_Free(v_frame);
-        return PR_FALSE;
-    } else if (rd != (PRUint32)length) {
+        return NULL;
+    } else if (rd != (PRUint32)*len) {
         PR_LOG(log, PR_LOG_NOTICE,
-            ("only read %u of %d from video pipe\n", rd, length));
+            ("only read %u of %d from video pipe\n", rd, *len));
         PR_Free(v_frame);
-        return PR_FALSE;
+        return NULL;
     }
+    
+    return v_frame;
+}
+
+/*
+ * Encode length bytes of video from the packet into Ogg stream
+ */
+PRBool
+MediaRecorder::EncodeVideo(PRUint8 *v_frame, int len)
+{
+    nsresult rv;
+    PRUint32 wr;
+    th_ycbcr_buffer v_buffer;
 
     /* Convert i420 to YCbCr */
     v_buffer[0].width = params->width;
@@ -275,6 +287,7 @@ MediaRecorder::Encode()
      * a second and encode 10 frames of video and 88200 bytes of audio per
      * run of the loop?
      */
+    int a_read = 0;
     int v_fps = FPS_N / FPS_D;
     int a_frame_num = FRAMES_BUFFER;
     if (v_rec) {
@@ -284,22 +297,41 @@ MediaRecorder::Encode()
     int v_frame_total = vState->backend->GetFrameSize();
     int a_frame_total = a_frame_num * aState->backend->GetFrameSize();
     
+    PRUint8 *v_frame;
+    PRInt16 *a_frames;
+    PRInt32 time_s, time_us, len;
     for (;;) {
-        /* Experience shows that audio streams are more or less consistent
+        /* Experience suggests that audio streams are more or less consistent
          * but video frames less so. Hence, we encode a_frame_total bytes
          * of audio first - which corresponds to exactly 1 frame of video
          * which may or may not have arrived yet.
          */
         if (a_rec) {
-            if (EncodeAudio(a_frame_total) == PR_FALSE) {
-                return;
+            while (a_read < a_frame_total) {
+                if (!(a_frames = GetAudioPacket(&len, &time_s, &time_us))) {
+                    return;
+                } else {
+                    /* EncodeAudio frees a_frames */
+                    if (EncodeAudio(a_frames, len) == PR_FALSE) {
+                        return;
+                    }
+                }
+                a_read += len;
             }
+            a_read = 0;
         }
+        
         if (v_rec) {
-            if (EncodeVideo(v_frame_total) == PR_FALSE) {
+            if (!(v_frame = GetVideoPacket(&len, &time_s, &time_us))) {
                 return;
+            } else {
+                /* EncodeVideo frees v_frame */
+                if (EncodeVideo(v_frame, v_frame_total) == PR_FALSE) {
+                    return;
+                }
             }
         }
+
         /* We keep looping until we reach EOF on either pipe */
     }
 }
