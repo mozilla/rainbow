@@ -38,100 +38,73 @@
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://rainbow/content/rainbow.js");
+const SCRIPT_TO_INJECT_URI = "resource://rainbow/content/injected.js";
 
-const PREFNAME = "allowedDomains";
-const DEFAULT_DOMAINS = ["http://localhost"];
+// DOUBLE RAINBOW!!
+var rainbow = new Rainbow();
+var observer = Components.classes["@mozilla.org/observer-service;1"].
+    getService(Components.interfaces.nsIObserverService);
 
-let RainbowInjector = {
-    SCRIPT_TO_INJECT_URI: "resource://rainbow/content/injected.js",
-    get _toInject() {
-        delete this._toInject;
+// Load up what we need to inject
+function getInjected() {
+    let ioSvc = Components.classes["@mozilla.org/network/io-service;1"].
+        getService(Ci.nsIIOService);
+    let uri = ioSvc.newURI(this.SCRIPT_TO_INJECT_URI, null, null).
+        QueryInterface(Components.interfaces.nsIFileURL);
+    let inputStream =
+        Components.classes["@mozilla.org/network/file-input-stream;1"].
+            createInstance(Components.interfaces.nsIFileInputStream);
 
-        let ioSvc = Components.classes["@mozilla.org/network/io-service;1"].
-            getService(Ci.nsIIOService);
-        let uri = ioSvc.newURI(this.SCRIPT_TO_INJECT_URI, null, null).
-            QueryInterface(Components.interfaces.nsIFileURL);
-        let inputStream =
-            Components.classes["@mozilla.org/network/file-input-stream;1"].
-                createInstance(Components.interfaces.nsIFileInputStream);
-    
-        inputStream.init(uri.file, 0x01, -1, null);
-        let lineStream = inputStream.
-            QueryInterface(Components.interfaces.nsILineInputStream);
+    inputStream.init(uri.file, 0x01, -1, null);
+    let lineStream = inputStream.
+        QueryInterface(Components.interfaces.nsILineInputStream);
 
-        let line = { value: "" }, hasMore, toInject = "";
-        do {
-            hasMore = lineStream.readLine(line);
-            toInject += line.value + "\n";
-        } while (hasMore);
-        lineStream.close();
+    let line = { value: "" }, hasMore, toInject = "";
+    do {
+        hasMore = lineStream.readLine(line);
+        toInject += line.value + "\n";
+    } while (hasMore);
+    lineStream.close();
+    return toInject;
+}
 
-        return this._toInject = toInject;
-    },
-
-    inject: function(win) {
-        let sandbox = new Components.utils.Sandbox(
-            Components.classes["@mozilla.org/systemprincipal;1"].
-               createInstance(Components.interfaces.nsIPrincipal)
-        );
-        sandbox.window = win.wrappedJSObject;
-
-        sandbox.importFunction(Rainbow.stop, "recStop");
-        sandbox.importFunction(Rainbow.recordToFile, "recFStart");
-        sandbox.importFunction(Rainbow.recordToSocket, "recSStart");
-        
-        Components.utils.evalInSandbox(
-            this._toInject, sandbox, "1.8", this.SCRIPT_TO_INJECT_URI, 1
-        );
-    }
-};
-
-let RainbowObserver = {
-    get _observer() {
-        delete this._observer;
-        return this._observer = 
-            Components.classes["@mozilla.org/observer-service;1"].
-                getService(Components.interfaces.nsIObserverService);
-    },
-
-    get _prefs() {
-        delete this._prefs;
-        return this._prefs =
-            Components.classes["@mozilla.org/preferences-service;1"].
-                getService(Ci.nsIPrefService).getBranch("extensions.rainbow.").
-                    QueryInterface(Ci.nsIPrefBranch2);
-    },
-
+var RainbowObserver = {
     QueryInterface: XPCOMUtils.generateQI([
         Components.interfaces.nsIObserver,
     ]),
 
-    onLoad: function() {
-        this._observer.addObserver(
-            this, "content-document-global-created", false
-        );
-    },
-
-    onUnload: function() {
-        this._observer.removeObserver(
-            this, "content-document-global-created"
-        );
-    },
-
     observe: function(subject, topic, data) {
-        if (this._prefs.getPrefType(PREFNAME) ==
-            Ci.nsIPrefBranch.PREF_INVALID) {
-            this._prefs.setCharPref(PREFNAME, JSON.stringify(DEFAULT_DOMAINS));
-        }
+        // We inject on all domains, permission checks are performed
+        // on-call in rainbow.js
+        let sandbox = new Components.utils.Sandbox(
+            Components.classes["@mozilla.org/systemprincipal;1"].
+               createInstance(Components.interfaces.nsIPrincipal)
+        );
+        sandbox.window = subject.wrappedJSObject;
 
-        let domains = JSON.parse(this._prefs.getCharPref(PREFNAME));
-        domains.forEach(function(domain) {
-            if (data === domain)
-                RainbowInjector.inject(subject);
-        });
+        sandbox.importFunction(function(loc, prop, ctx, obs) {
+            rainbow._verifyPermission(window, loc, function(allowed) {
+                if (allowed) rainbow.recordToFile_verified(prop, ctx, obs);
+                else throw "Permission denied";
+            });
+        }, "recStart");
+        sandbox.importFunction(function(loc) {
+            rainbow._verifyPermission(window, loc, function(allowed) {
+                if (allowed) rainbow.stop_verified();
+                else throw "Permission denied";
+            });
+        }, "recStop");
+
+        let toInject = getInjected();
+        Components.utils.evalInSandbox(
+            toInject, sandbox, "1.8", this.SCRIPT_TO_INJECT_URI, 1
+        );
     }
 };
 
-window.addEventListener("load", function() RainbowObserver.onLoad(), false);
-window.addEventListener("unload", function() RainbowObserver.onUnload(), false);
-
+window.addEventListener("load", function() {
+    observer.addObserver(RainbowObserver, "content-document-global-created", false);
+}, false);
+window.addEventListener("unload", function() {
+    observer.removeObserver(RainbowObserver, "content-document-global-created");
+}, false);

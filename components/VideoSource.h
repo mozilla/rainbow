@@ -35,6 +35,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#ifndef _VIDEOSOURCE_H
+#define _VIDEOSOURCE_H
 /*
  * Interface for video sources to implement
  * TODO: Figure out if and how to do device selection
@@ -49,8 +51,8 @@
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 /* Defaults */
-#define FPS_N   30000
-#define FPS_D   1001
+#define FPS_N   15000
+#define FPS_D   1000
 #define WIDTH   640
 #define HEIGHT  480
 
@@ -102,7 +104,8 @@ public:
 
     NS_IMETHOD Run() {
         return m_pCtx->PutImageData_explicit(
-            0, 0, m_width, m_height, m_pData.get(), m_pDataSize
+            0, 0, m_width, m_height, m_pData.get(), m_pDataSize,
+            PR_TRUE, 0, 0, m_width, m_height
         );
     }
 
@@ -114,4 +117,6 @@ private:
     PRUint32 m_pDataSize;
 
 };
+
+#endif
 

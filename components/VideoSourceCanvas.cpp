@@ -34,29 +34,78 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "AudioSource.h"
-#include <portaudio.h>
+#include "VideoSourceCanvas.h"
 
-class AudioSourceMac : public AudioSource {
-public:
-    AudioSourceMac(int c, int r);
-    ~AudioSourceMac();
+VideoSourceCanvas::VideoSourceCanvas(int w, int h)
+    : VideoSource(w, h)
+{
+    /* Nothing much to do here. We sample at a constant 30fps */
+    fps_n = 30;
+    fps_d = 1;
+    g2g = PR_TRUE;
+    recording = PR_FALSE;
+}
 
-    nsresult Stop();
-    nsresult Start(nsIOutputStream *pipe);
+VideoSourceCanvas::~VideoSourceCanvas()
+{
+}
 
-protected:
-    PaStream *stream;
-    PaDeviceIndex source;
-    nsIOutputStream *output;
+nsresult
+VideoSourceCanvas::Start(
+    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
 
-    static int Callback(
-        const void *input, void *output, unsigned long frames,
-        const PaStreamCallbackTimeInfo* time,
-        PaStreamCallbackFlags flags, void *data
+    vCanvas = ctx;
+    output = pipe;
+
+    /* Start a thread to sample canvas */
+    recording = PR_TRUE;
+    sampler = PR_CreateThread(
+        PR_SYSTEM_THREAD, VideoSourceCanvas::Grabber, this,
+        PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD, PR_JOINABLE_THREAD, 0
     );
+    return NS_OK;
+}
 
-    PRInt32 epoch_s;
-    PRInt32 epoch_us;
-    double start;
-};
+nsresult
+VideoSourceCanvas::Stop()
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+
+    recording = PR_FALSE;
+    PR_JoinThread(sampler);
+    return NS_OK;
+}
+
+void
+VideoSourceCanvas::Grabber(void *data)
+{
+    nsresult rv;
+    PRUint32 wr;
+    VideoSourceCanvas *vs = static_cast<VideoSourceCanvas*>(data);
+    
+    int isize = vs->GetFrameSize();
+    int fsize = vs->width * vs->height * 4;
+    char *i420 = (char *)PR_Calloc(isize, 1);
+    PRUint8 *rgb32 = (PRUint8 *)PR_Calloc(fsize, 1);
+
+    PRIntervalTime ticks = PR_TicksPerSecond() / 30;
+    while (vs->recording) {
+        PR_Sleep(ticks);
+        rv = vs->vCanvas->GetImageData_explicit(
+            0, 0, vs->width, vs->height, rgb32, fsize
+        );
+        if (NS_FAILED(rv)) continue;
+
+        RGB32toI420(vs->width, vs->height, (const char *)rgb32, i420);
+        rv = vs->output->Write((const char *)i420, isize, &wr);
+    }
+
+    PR_Free(i420);
+    PR_Free(rgb32);
+    return;
+}
+

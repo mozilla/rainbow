@@ -47,16 +47,16 @@
 #include <plbase64.h>
 #include <prthread.h>
 
-#include <nsCOMPtr.h>
-#include <nsAutoPtr.h>
-#include <nsStringAPI.h>
-
 #include <nsIPipe.h>
 #include <nsIFileStreams.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
-#include <nsComponentManagerUtils.h>
 #include <nsIDOMCanvasRenderingContext2D.h>
+
+#include <nsCOMPtr.h>
+#include <nsAutoPtr.h>
+#include <nsStringAPI.h>
+#include <nsComponentManagerUtils.h>
 
 /* ifdefs are evil, but I am powerless. This is better than factory classes! */
 #ifdef RAINBOW_Mac
@@ -71,6 +71,8 @@
 #include "VideoSourceNix.h"
 #include "AudioSourceNix.h"
 #endif
+
+#include "VideoSourceCanvas.h"
 
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
@@ -107,7 +109,7 @@ typedef struct {
 
 typedef struct {
     double qual;
-    PRBool audio, video;
+    PRBool audio, video, source, canvas;
     PRUint32 fps_n, fps_d, width, height, rate, chan;
 } Properties;
 
@@ -126,37 +128,40 @@ protected:
     Audio *aState;
     Video *vState;
 
-    PRThread *encoder;
+    PRThread *thread;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
+    nsIDOMCanvasRenderingContext2D *canvas;
+    
+    nsCOMPtr<nsIOutputStream> pipeStream;
+    nsCOMPtr<nsIAsyncInputStream> sockIn;
+    nsCOMPtr<nsIAsyncOutputStream> sockOut;
+    nsCOMPtr<nsIMediaStateObserver> observer;
+    
+    static MediaRecorder *gMediaRecordingService;
+
+    static void Record(void *data);
+    static void StopRecord(void *data);
 
     nsresult SetupTheoraBOS();
     nsresult SetupVorbisBOS();
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
-
-    nsCOMPtr<nsIWebSocket> pipeSock;
-    nsCOMPtr<nsIOutputStream> pipeFile;
-
-    nsCOMPtr<nsIAsyncInputStream> sockIn;
-    nsCOMPtr<nsIAsyncOutputStream> sockOut;
-
-    static MediaRecorder *gMediaRecordingService;
-
-    static void Encode(void *data);
-    static void WriteAudio(void *data);
-    static nsresult WriteData(
-        void *obj, unsigned char *data, PRUint32 len, PRUint32 *wr
-    );
-
+    
+    void Encode();
+    void WriteAudio();
+    PRBool EncodeVideo(PRUint8 *v_frame, int len);
+    PRBool EncodeAudio(PRInt16 *a_frames, int len);
+    PRUint8 * GetVideoPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us);
+    PRInt16 * GetAudioPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us);
+    
     void ParseProperties(nsIPropertyBag2 *prop);
-    nsresult Record(nsIDOMCanvasRenderingContext2D *ctx);
+    nsresult WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr);
     nsresult MakePipe(nsIAsyncInputStream **in, nsIAsyncOutputStream **out);
 
 private:
     Properties *params;
-
 };
 
 #endif

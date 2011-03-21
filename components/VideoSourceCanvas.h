@@ -34,29 +34,26 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "AudioSource.h"
-#include <portaudio.h>
+/*
+ * Record video FROM a canvas
+ */
+#include "VideoSource.h"
+#include <prmem.h>
 
-class AudioSourceMac : public AudioSource {
+class VideoSourceCanvas : public VideoSource {
 public:
-    AudioSourceMac(int c, int r);
-    ~AudioSourceMac();
+    VideoSourceCanvas(int w, int h);
+    ~VideoSourceCanvas();
 
     nsresult Stop();
-    nsresult Start(nsIOutputStream *pipe);
+    nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
 
 protected:
-    PaStream *stream;
-    PaDeviceIndex source;
+    PRBool recording;
+    PRThread *sampler;
     nsIOutputStream *output;
-
-    static int Callback(
-        const void *input, void *output, unsigned long frames,
-        const PaStreamCallbackTimeInfo* time,
-        PaStreamCallbackFlags flags, void *data
-    );
-
-    PRInt32 epoch_s;
-    PRInt32 epoch_us;
-    double start;
+    nsIDOMCanvasRenderingContext2D *vCanvas;
+    static void Grabber(void * data);
+        
 };
+

@@ -63,7 +63,6 @@ else
   cpp_sources += $(os)/VideoSource$(teh).cpp
 endif
 cpp_objects = $(cpp_sources:.cpp=.o)
-
 sdkdir ?= ${MOZSDKDIR}
 xpidl = $(sdkdir)/bin/xpidl
 

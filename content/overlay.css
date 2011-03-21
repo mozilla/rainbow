@@ -1,0 +1,4 @@
+.popup-notification-icon[popupid="rainbow-access-request"]
+{
+  list-style-image: url("chrome://rainbow/content/request.png");
+}

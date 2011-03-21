@@ -13,7 +13,6 @@
     <input type="file" id="tehfile" style="display:none;"></input>
 </body>
 <script type="application/javascript;version=1.8">
-    let Sr, Fi;
     let Re = false;
     let img = new Image();
     let msg = document.getElementById("tehmsg");
@@ -26,24 +25,41 @@
         ctx.drawImage(img, 192, 112);
     }
 
+    function onStateChange(type, arg) {
+        switch (type) {
+            case "started":
+                msg.innerHTML = "Recording has begun!";
+                break;
+            case "stopped":
+                // Recording stopped, but file not ready yet
+                break;
+            case "finished":
+                // File is now available
+                // arg is a DOM File, see
+                // https://developer.mozilla.org/en/Using_files_from_web_applications
+                msg.innerHTML = "Your video was named: " +
+                    arg.files.item(0).fileName + " and is " +
+                    arg.files.item(0).fileSize + " bytes big!";
+                break;
+            case "error":
+                msg.innerHTML = "There was an error :( " + type + " :: " + arg;
+                break;
+        }
+    }
+    
     but.onclick = function() {
         if (Re) {
             // Stop recording
-            Fi = Sr.stop();
+            Me.stop();
             Re = false;
             but.value = "Start!";
             ctx.drawImage(img, 192, 112);
-
-            // See https://developer.mozilla.org/en/Using_files_from_web_applications
-            msg.innerHTML = "Your video was named: " +
-                Fi.files.item(0).fileName + " and is " +
-                Fi.files.item(0).fileSize + " bytes big!";
         } else {
             // Start recording
             Re = true;
             but.value = "Stop!";
-            msg.innerHTML = " ";
-            Sr = Me.recordToFile({}, ctx);
+            msg.innerHTML = "Loading...";
+            Me.recordToFile({}, ctx, onStateChange);
         }
     }
 </script>
