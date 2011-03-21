@@ -38,6 +38,7 @@
 #include "VideoSourceMac.h"
 
 FILE *tmp;
+#define MICROSECONDS 1000000
 
 /* Objective-C Implementation here */
 @interface MozQTCapture : NSObject {
@@ -64,8 +65,12 @@ FILE *tmp;
 
 
 @interface MozQTVideoOutput : QTCaptureDecompressedVideoOutput {
+    nsIOutputStream *output;
+    nsIDOMCanvasRenderingContext2D *canvas;
 }
 
+- (id)initWithStream:(nsIOutputStream *)pipe
+    andCanvas:(nsIDOMCanvasRenderingContext2D *)canvas;
 - (void)outputVideoFrame:(CVImageBufferRef)videoFrame
     withSampleBuffer:(QTSampleBuffer *)sampleBuffer
     fromConnection:(QTCaptureConnection *)connection;
@@ -74,21 +79,55 @@ FILE *tmp;
 
 @implementation MozQTVideoOutput
 
+- (id)initWithStream:(nsIOutputStream *)pipe
+    andCanvas:(nsIDOMCanvasRenderingContext2D *)ctx
+{
+    if ((self = [super init])) {
+        output = pipe;
+        canvas = ctx;
+    }
+    return self;
+}
+
 - (void)outputVideoFrame:(CVImageBufferRef)videoFrame
     withSampleBuffer:(QTSampleBuffer *)sampleBuffer
     fromConnection:(QTCaptureConnection *)connection
 {
+    nsresult rv;
     CVBufferRetain(videoFrame);
     CVPixelBufferLockBaseAddress(videoFrame, 0);
     
     void *addr;
-    size_t w, h;
+    size_t w, h, fsize;
     w = CVPixelBufferGetWidth(videoFrame);
     h = CVPixelBufferGetHeight(videoFrame);
+    fsize = (w * h * 3) / 2;
     
     addr = CVPixelBufferGetBaseAddressOfPlane(videoFrame, 0);
     /* each i420 frame is w * h * 3 / 2 bytes long */
-    fwrite(addr, (w * h * 3) / 2, 1, tmp);
+    fwrite(addr, fsize, 1, tmp);
+    
+    /* Write to canvas */
+    if (canvas) {
+        /* Convert i420 to RGB32 to write on canvas */
+        nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[w * h * 4]);
+        I420toRGB32(w, h, (const char *)addr, (char *)rgb32.get());
+        nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
+            canvas, w, h, rgb32, fsize
+        );
+        rv = NS_DispatchToMainThread(render);
+    }
+    
+    /* Write to pipe. Bogus timestamp info for now */
+    PRUint32 wr;
+    PRTime now = PR_Now();
+    long now_s = (PRInt32)(now / MICROSECONDS);
+    long now_ms = (PRInt32)(now % MICROSECONDS);
+    
+    output->Write((const char *)&now_s, sizeof(PRInt32), &wr);
+    output->Write((const char *)&now_ms, sizeof(PRInt32), &wr);
+    output->Write((const char *)&fsize, sizeof(PRUint32), &wr);
+    output->Write((const char *)addr, fsize, &wr);
     
     CVPixelBufferUnlockBaseAddress(videoFrame, 0);
     CVBufferRelease(videoFrame);
@@ -125,8 +164,8 @@ FILE *tmp;
         return NO;
     }
     
-    mOutput = [[MozQTVideoOutput alloc] init];
-    //[mOutput setDelegate:self];
+    mOutput = [[MozQTVideoOutput alloc] initWithStream:pipe andCanvas:ctx];
+    [mOutput setDelegate:self];
     [mOutput setAutomaticallyDropsLateVideoFrames:YES];
     
     NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -181,7 +220,7 @@ FILE *tmp;
     withSampleBuffer:(QTSampleBuffer *)sampleBuffer
     fromConnection:(QTCaptureConnection *)connection
 {
-    NSLog(@"CALLBACK!!!! %@", [NSRunLoop currentRunLoop]);
+    NSLog(@"CALLBACK! %@", [NSRunLoop currentRunLoop]);
 }
 
 @end
@@ -205,8 +244,7 @@ VideoSourceMac::~VideoSourceMac()
 }
 
 nsresult
-VideoSourceMac::Start(
-    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
+VideoSourceMac::Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
 {
     if (!g2g)
         return NS_ERROR_FAILURE;

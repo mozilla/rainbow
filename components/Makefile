@@ -55,7 +55,7 @@ so_target = $(target:=.$(so))
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
-    VideoSource.cpp AudioSource.cpp $(os)/AudioSource$(teh).cpp
+    VideoSource.cpp VideoSourceCanvas.cpp AudioSource.cpp $(os)/AudioSource$(teh).cpp
 ifeq ($(os), Darwin)
   obj_sources = $(os)/VideoSource$(teh).mm
   obj_objects = $(os)/VideoSource$(teh).o

@@ -138,7 +138,7 @@ MediaRecorder::GetAudioPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
     } else if (rd != (PRUint32)*len) {
         /* Hmm. I sure hope this is the end of the recording. */
         if (!a_stp) {
-            PR_LOG(mr->log, PR_LOG_NOTICE,
+            PR_LOG(log, PR_LOG_NOTICE,
                 ("only read %u of %d from audio pipe\n", rd, *len));
         }
         PR_Free(a_frames);
