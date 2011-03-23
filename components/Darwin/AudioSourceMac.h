@@ -56,7 +56,6 @@ protected:
         PaStreamCallbackFlags flags, void *data
     );
 
-    PRInt32 epoch_s;
-    PRInt32 epoch_us;
     double start;
+    PRFloat64 epoch;
 };

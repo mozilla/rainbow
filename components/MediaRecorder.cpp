@@ -35,6 +35,8 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "MediaRecorder.h"
+#define MICROSECONDS 1000000
+#define TOLERANCE 100000
 
 NS_IMPL_ISUPPORTS1(MediaRecorder, IMediaRecorder)
 
@@ -114,17 +116,16 @@ MediaRecorder::WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr)
  * Get an audio packet from the pipe.
  */
 PRInt16 *
-MediaRecorder::GetAudioPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
+MediaRecorder::GetAudioPacket(PRInt32 *len, PRFloat64 *times)
 {
     nsresult rv;
     PRUint32 rd;
     PRInt16 *a_frames;
     
     /* Get audio frame header */
-    rv = aState->aPipeIn->Read((char *)time_s, sizeof(PRInt32), &rd);
-    rv = aState->aPipeIn->Read((char *)time_us, sizeof(PRInt32), &rd);
+    rv = aState->aPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = aState->aPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got audio frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
+    fprintf(stderr, "Got audio frame for %d bytes at %f\n", *len, *times);
     
     a_frames = (PRInt16 *) PR_Calloc(*len, sizeof(PRUint8));
     do aState->aPipeIn->Available(&rd);
@@ -169,7 +170,6 @@ MediaRecorder::EncodeAudio(PRInt16 *a_frames, int len)
     /* Tell libvorbis to do its thing */
     vorbis_analysis_wrote(&aState->vd, n);
     WriteAudio();
-    PR_Free(a_frames);
     
     return PR_TRUE;
 }
@@ -178,17 +178,16 @@ MediaRecorder::EncodeAudio(PRInt16 *a_frames, int len)
  * Get an audio packet from the pipe.
  */
 PRUint8 *
-MediaRecorder::GetVideoPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
+MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
 {
     nsresult rv;
     PRUint32 rd;
     PRUint8 *v_frame;
     
     /* Get video frame header */
-    rv = vState->vPipeIn->Read((char *)time_s, sizeof(PRInt32), &rd);
-    rv = vState->vPipeIn->Read((char *)time_us, sizeof(PRInt32), &rd);
+    rv = vState->vPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got video frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
+    fprintf(stderr, "Got video frame for %d bytes at %f\n", *len, *times);
     
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);
@@ -239,12 +238,10 @@ MediaRecorder::EncodeVideo(PRUint8 *v_frame, int len)
     /* Encode 'er up */
     if (th_encode_ycbcr_in(vState->th, v_buffer) != 0) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not encode frame\n"));
-        PR_Free(v_frame);
         return PR_FALSE;
     }
     if (!th_encode_packetout(vState->th, 0, &vState->op)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not read packet\n"));
-        PR_Free(v_frame);
         return PR_FALSE;
     }
 
@@ -253,8 +250,7 @@ MediaRecorder::EncodeVideo(PRUint8 *v_frame, int len)
         rv = WriteData(vState->og.header, vState->og.header_len, &wr);
         rv = WriteData(vState->og.body, vState->og.body_len, &wr);
     }
-
-    PR_Free(v_frame);
+    
     return PR_TRUE;
 }
 
@@ -285,7 +281,8 @@ MediaRecorder::Encode()
      * TODO: Figure out if PR_Calloc will be more efficient if we call it for
      * storing more than just 1 frame at a time. For instance, we can wait
      * a second and encode 10 frames of video and 88200 bytes of audio per
-     * run of the loop?
+     * run of the loop? Possible answer: No, because the timing might go
+     * awry, we are better off processing timestamps per frame of video.
      */
     int a_read = 0;
     int v_fps = FPS_N / FPS_D;
@@ -294,45 +291,77 @@ MediaRecorder::Encode()
         v_fps = vState->backend->GetFPSN() / vState->backend->GetFPSD();
         a_frame_num = params->rate/(v_fps);
     }
-    int v_frame_total = vState->backend->GetFrameSize();
-    int a_frame_total = a_frame_num * aState->backend->GetFrameSize();
+    //int v_frame_size = vState->backend->GetFrameSize();
+    int a_frame_size = aState->backend->GetFrameSize();
+    int a_frame_total = a_frame_num * a_frame_size;
+    //int ms_per_vframe = MICROSECONDS / v_fps;
+    //int ms_per_aframe = ms_per_vframe / a_frame_num;
     
     PRUint8 *v_frame;
     PRInt16 *a_frames;
-    PRInt32 time_s, time_us, len;
-    for (;;) {
-        /* Experience suggests that audio streams are more or less consistent
-         * but video frames less so. Hence, we encode a_frame_total bytes
-         * of audio first - which corresponds to exactly 1 frame of video
-         * which may or may not have arrived yet.
+    PRFloat64 atime, vtime;
+    PRInt32 vlen, alen, anum;
+    
+    if (v_rec && a_rec) {
+        /* If video recording was requested, we started it first so it is
+         * very likely that the video frame arrived first. This means we will
+         * encode audio first and drop a few frames of video to align the
+         * start times.
          */
-        if (a_rec) {
+multiplex:
+        while (a_read < a_frame_total) {
+            if (!(a_frames = GetAudioPacket(&alen, &atime))) {
+                return;
+            } else {
+                if (EncodeAudio(a_frames, alen) == PR_FALSE) {
+                    PR_Free(a_frames);
+                    return;
+                }
+            }
+            a_read += alen;
+            PR_Free(a_frames);
+        }
+        anum = a_read / a_frame_size;
+        a_read = 0;
+        
+        //PRInt32 elapsed = anum * ms_per_aframe;
+        if (!(v_frame = GetVideoPacket(&vlen, &vtime)))
+            return;
+        /* We only get 1 frame per video packet from existing backends */
+        if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
+            PR_Free(v_frame);
+            return;
+        }
+        goto multiplex;
+        
+    } else if (v_rec && !a_rec) {
+        for (;;) {
+            if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
+                return;
+            } else {
+                if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
+                    PR_Free(v_frame);
+                    return;
+                }
+            }
+            PR_Free(v_frame);
+        }
+    } else if (a_rec && !v_rec) {
+        for (;;) {
             while (a_read < a_frame_total) {
-                if (!(a_frames = GetAudioPacket(&len, &time_s, &time_us))) {
+                if (!(a_frames = GetAudioPacket(&alen, &atime))) {
                     return;
                 } else {
-                    /* EncodeAudio frees a_frames */
-                    if (EncodeAudio(a_frames, len) == PR_FALSE) {
+                    if (EncodeAudio(a_frames, alen) == PR_FALSE) {
+                        PR_Free(a_frames);
                         return;
                     }
                 }
-                a_read += len;
+                a_read += alen;
+                PR_Free(a_frames);
             }
             a_read = 0;
         }
-        
-        if (v_rec) {
-            if (!(v_frame = GetVideoPacket(&len, &time_s, &time_us))) {
-                return;
-            } else {
-                /* EncodeVideo frees v_frame */
-                if (EncodeVideo(v_frame, v_frame_total) == PR_FALSE) {
-                    return;
-                }
-            }
-        }
-
-        /* We keep looping until we reach EOF on either pipe */
     }
 }
 

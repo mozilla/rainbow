@@ -153,8 +153,8 @@ protected:
     void WriteAudio();
     PRBool EncodeVideo(PRUint8 *v_frame, int len);
     PRBool EncodeAudio(PRInt16 *a_frames, int len);
-    PRUint8 * GetVideoPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us);
-    PRInt16 * GetAudioPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us);
+    PRUint8 * GetVideoPacket(PRInt32 *len, PRFloat64 *times);
+    PRInt16 * GetAudioPacket(PRInt32 *len, PRFloat64 *times);
     
     void ParseProperties(nsIPropertyBag2 *prop);
     nsresult WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr);

@@ -113,19 +113,16 @@ AudioSourceMac::Start(nsIOutputStream *pipe)
     }
     
     /* Establish baseline stream time with absolute time since epoch */
-    PRTime epoch = PR_Now();
+    PRTime epoch_c = PR_Now();
     start = Pa_GetStreamTime(stream);
+    
+    epoch = (PRFloat64)(epoch_c / MICROSECONDS);
+    epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
     
     if (Pa_StartStream(stream) != paNoError) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not start stream!"));
         return NS_ERROR_FAILURE;
     }
-    
-    /* XXX: We're assuming the existence of long long but that's ok since
-     * we know we are on an x86 mac anyway.
-     */
-    epoch_s = (PRInt32)(epoch / MICROSECONDS);
-    epoch_us = (PRInt32)(epoch % MICROSECONDS);
     
     output = pipe;
     return NS_OK;
@@ -155,22 +152,12 @@ AudioSourceMac::Callback(const void *input, void *output,
      * We take timeInfo->currentTime as the timestamp of the sample instead
      */
     double delta = timeInfo->currentTime - asa->start;
-    PRInt32 delta_us = (PRInt32)((delta - (PRInt32)delta) * MICROSECONDS); 
-    
-    /* Determine seconds and milliseconds since established baseline */
-    PRInt32 current_us = asa->epoch_us + delta_us;
-    PRInt32 current_s = asa->epoch_s + (PRInt32)delta;
-    if (current_us > MICROSECONDS) {
-        current_s += 1; current_us = current_us - MICROSECONDS;
-    }
+    PRFloat64 current = asa->epoch + delta;
     
     /* Write header: timestamp + length */
     PRUint32 length = frames * asa->GetFrameSize();
     rv = asa->output->Write(
-        (const char *)&current_s, sizeof(PRInt32), &wr
-    );
-    rv = asa->output->Write(
-        (const char *)&current_us, sizeof(PRInt32), &wr
+        (const char *)&current, sizeof(PRFloat64), &wr
     );
     rv = asa->output->Write(
         (const char *)&length, sizeof(PRUint32), &wr

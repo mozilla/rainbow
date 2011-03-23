@@ -35,6 +35,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "VideoSourceMac.h"
+#define MICROSECONDS 1000000
 
 VideoSourceMac::VideoSourceMac(int w, int h)
     : VideoSource(w, h)
@@ -167,12 +168,12 @@ VideoSourceMac::Callback(
     PRUint32 wr;
     VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
 
+    PRFloat64 current = (PRFloat64)video->capture_time_sec;
+    current += ((PRFloat64)video->capture_time_usec / MICROSECONDS);
+    
     /* Write header: timestamp + length */
     rv = vsm->output->Write(
-        (const char *)&video->capture_time_sec, sizeof(PRInt32), &wr
-    );
-    rv = vsm->output->Write(
-        (const char *)&video->capture_time_usec, sizeof(PRInt32), &wr
+        (const char *)&current, sizeof(PRFloat64), &wr
     );
     rv = vsm->output->Write(
         (const char *)&video->video_data_size, sizeof(PRUint32), &wr
