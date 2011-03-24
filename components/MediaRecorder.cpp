@@ -36,7 +36,7 @@
 
 #include "MediaRecorder.h"
 #define MICROSECONDS 1000000
-#define TOLERANCE 100000
+#define TOLERANCE 0.100000
 
 NS_IMPL_ISUPPORTS1(MediaRecorder, IMediaRecorder)
 
@@ -125,7 +125,6 @@ MediaRecorder::GetAudioPacket(PRInt32 *len, PRFloat64 *times)
     /* Get audio frame header */
     rv = aState->aPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = aState->aPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got audio frame for %d bytes at %f\n", *len, *times);
     
     a_frames = (PRInt16 *) PR_Calloc(*len, sizeof(PRUint8));
     do aState->aPipeIn->Available(&rd);
@@ -187,7 +186,6 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
     /* Get video frame header */
     rv = vState->vPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got video frame for %d bytes at %f\n", *len, *times);
     
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);
@@ -291,16 +289,16 @@ MediaRecorder::Encode()
         v_fps = vState->backend->GetFPSN() / vState->backend->GetFPSD();
         a_frame_num = params->rate/(v_fps);
     }
-    //int v_frame_size = vState->backend->GetFrameSize();
+    int v_frame_size = vState->backend->GetFrameSize();
     int a_frame_size = aState->backend->GetFrameSize();
     int a_frame_total = a_frame_num * a_frame_size;
-    //int ms_per_vframe = MICROSECONDS / v_fps;
-    //int ms_per_aframe = ms_per_vframe / a_frame_num;
     
-    PRUint8 *v_frame;
-    PRInt16 *a_frames;
-    PRFloat64 atime, vtime;
-    PRInt32 vlen, alen, anum;
+    PRUint8 *v_frame = NULL;
+    PRInt16 *a_frames = NULL;
+    PRUint8 *v_frame_tmp = NULL;
+    
+    PRInt32 vlen, alen;
+    PRFloat64 atime, delta, vtime = 0;
     
     if (v_rec && a_rec) {
         /* If video recording was requested, we started it first so it is
@@ -311,58 +309,84 @@ MediaRecorder::Encode()
 multiplex:
         while (a_read < a_frame_total) {
             if (!(a_frames = GetAudioPacket(&alen, &atime))) {
-                return;
+                goto video;
             } else {
                 if (EncodeAudio(a_frames, alen) == PR_FALSE) {
-                    PR_Free(a_frames);
-                    return;
+                    goto finish;
                 }
             }
             a_read += alen;
             PR_Free(a_frames);
+            a_frames = NULL;
         }
-        anum = a_read / a_frame_size;
         a_read = 0;
         
-        //PRInt32 elapsed = anum * ms_per_aframe;
-        if (!(v_frame = GetVideoPacket(&vlen, &vtime)))
-            return;
-        /* We only get 1 frame per video packet from existing backends */
-        if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
-            PR_Free(v_frame);
-            return;
+        /* Experience also suggests that the audio stream is more or less
+         * consistent; so the question really is if we need to duplicate or
+         * drop video packets to match the FPS that we committed to. First
+         * we drop all packets until we reach timestamp indicated by audio.
+         */
+video:
+        delta = vtime - atime;
+        while (delta < 0) {
+            if (v_frame_tmp) {
+                PR_Free(v_frame_tmp); v_frame_tmp = NULL;
+            }
+            v_frame_tmp = GetVideoPacket(&vlen, &vtime);
+            delta = vtime - atime;
         }
+
+        if (delta < TOLERANCE) {
+            /* This video frame appeared right after the audio frame, but
+             * within our tolerance levels, so we encode it and keep a
+             * copy in case we need to duplicate it on the next run
+             */
+            if (v_frame) PR_Free(v_frame);
+            v_frame = v_frame_tmp; v_frame_tmp = NULL;
+            if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
+                goto finish;
+            }
+        } else {
+            /* Frame we got was too late, so re-use our old one */
+            if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
+                goto finish;
+            }
+        }
+        
         goto multiplex;
         
     } else if (v_rec && !a_rec) {
         for (;;) {
             if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
-                return;
+                goto finish;
             } else {
                 if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
-                    PR_Free(v_frame);
-                    return;
+                    goto finish;
                 }
             }
-            PR_Free(v_frame);
+            PR_Free(v_frame); v_frame = NULL;
         }
     } else if (a_rec && !v_rec) {
         for (;;) {
             while (a_read < a_frame_total) {
                 if (!(a_frames = GetAudioPacket(&alen, &atime))) {
-                    return;
+                    goto finish;
                 } else {
                     if (EncodeAudio(a_frames, alen) == PR_FALSE) {
-                        PR_Free(a_frames);
-                        return;
+                        goto finish;
                     }
                 }
                 a_read += alen;
-                PR_Free(a_frames);
+                PR_Free(a_frames); a_frames = NULL;
             }
             a_read = 0;
         }
     }
+    
+finish:
+    if (v_frame) PR_Free(v_frame);
+    if (a_frames) PR_Free(a_frames);
+    
 }
 
 
