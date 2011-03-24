@@ -124,7 +124,7 @@ MediaRecorder::GetAudioPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
     rv = aState->aPipeIn->Read((char *)time_s, sizeof(PRInt32), &rd);
     rv = aState->aPipeIn->Read((char *)time_us, sizeof(PRInt32), &rd);
     rv = aState->aPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got audio frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
+    //fprintf(stderr, "Got audio frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
     
     a_frames = (PRInt16 *) PR_Calloc(*len, sizeof(PRUint8));
     do aState->aPipeIn->Available(&rd);
@@ -188,7 +188,7 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRInt32 *time_s, PRInt32 *time_us)
     rv = vState->vPipeIn->Read((char *)time_s, sizeof(PRInt32), &rd);
     rv = vState->vPipeIn->Read((char *)time_us, sizeof(PRInt32), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    fprintf(stderr, "Got video frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
+    //fprintf(stderr, "Got video frame for %d bytes at %d :: %d\n", *len, *time_s, *time_us);
     
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);

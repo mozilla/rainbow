@@ -38,6 +38,7 @@
 #include "VideoSourceMac.h"
 
 FILE *tmp;
+BOOL shouldKeepRunning;
 #define MICROSECONDS 1000000
 
 /* Objective-C Implementation here */
@@ -67,6 +68,7 @@ FILE *tmp;
 @interface MozQTVideoOutput : QTCaptureDecompressedVideoOutput {
     nsIOutputStream *output;
     nsIDOMCanvasRenderingContext2D *canvas;
+    NSAutoreleasePool *pool;
 }
 
 - (id)initWithStream:(nsIOutputStream *)pipe
@@ -85,8 +87,15 @@ FILE *tmp;
     if ((self = [super init])) {
         output = pipe;
         canvas = ctx;
+        pool = [[NSAutoreleasePool alloc] init];
     }
     return self;
+}
+
+- (void)dealloc
+{
+    [pool release];
+    [super dealloc];
 }
 
 - (void)outputVideoFrame:(CVImageBufferRef)videoFrame
@@ -116,6 +125,7 @@ FILE *tmp;
             canvas, w, h, rgb32, fsize
         );
         rv = NS_DispatchToMainThread(render);
+        //fprintf(stderr, "Dispatched to main thread! %d\n", rv);
     }
     
     /* Write to pipe. Bogus timestamp info for now */
@@ -202,6 +212,7 @@ FILE *tmp;
     if ([[mVideo device] isOpen])
         [[mVideo device] close];
     
+    shouldKeepRunning = NO;
     NSLog(@"Ended session %d!", [mSession isRunning]);
     return YES;
 }
@@ -231,16 +242,12 @@ VideoSourceMac::VideoSourceMac(int w, int h)
 {
     fps_n = 15;
     fps_d = 1;
-    
-    pool = [[NSAutoreleasePool alloc] init];
-    objc = [[MozQTCapture alloc] init];
     g2g = PR_TRUE;
 }
 
 VideoSourceMac::~VideoSourceMac()
 {
     [(id)objc release];
-    [(id)pool release];
 }
 
 nsresult
@@ -249,14 +256,42 @@ VideoSourceMac::Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx
     if (!g2g)
         return NS_ERROR_FAILURE;
 
-    MozQTCapture *mqtc = (id)objc;
-    if ([mqtc start:pipe withCanvas:ctx width:width andHeight:height]) {
+    objc = [[MozQTCapture alloc] init];    
+    output = pipe;
+    canvas = ctx;
+
+    thread = PR_CreateThread(
+        PR_SYSTEM_THREAD,
+        VideoSourceMac::ReallyStart, this,
+        PR_PRIORITY_NORMAL,
+        PR_GLOBAL_THREAD,
+        PR_JOINABLE_THREAD, 0
+    );
+    
+    return NS_OK;
+}
+
+void
+VideoSourceMac::ReallyStart(void *data)
+{
+    VideoSourceMac *vsm = static_cast<VideoSourceMac*>(data);
+    
+    NSRunLoop *loop = [NSRunLoop currentRunLoop];
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    
+    if ([(id)vsm->objc start:vsm->output withCanvas:vsm->canvas width:vsm->width andHeight:vsm->height]) {
         NSLog(@"Started MozQTCapture!");
-        //[[NSRunLoop mainRunLoop] run];
-        return NS_OK;
-    } else {
-        return NS_ERROR_FAILURE;
+        NSLog(@"The loop is: %@", loop);
+        
+        shouldKeepRunning = YES;
+        while (shouldKeepRunning) {
+            [loop runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
+        };
+        
+        NSLog(@"Run loop returned!!");
     }
+    
+    [pool drain];
 }
 
 nsresult
@@ -265,10 +300,13 @@ VideoSourceMac::Stop()
     if (!g2g)
         return NS_ERROR_FAILURE;
 
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     MozQTCapture *mqtc = (id)objc;
     if ([mqtc stop]) {
+        [pool drain];
         return NS_OK;
     }
+    [pool drain];
     return NS_ERROR_FAILURE;
 }
 

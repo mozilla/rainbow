@@ -50,7 +50,11 @@ public:
 
 protected:
     void *objc;
-    void *pool;
     
+    nsIOutputStream *output;
+    nsIDOMCanvasRenderingContext2D *canvas;
+    
+    PRThread *thread;
+    static void ReallyStart(void *data);
 };
 
