@@ -37,6 +37,7 @@
 
 #include "VideoSourceWin.h"
 #include "nsStringAPI.h"
+#define MICROSECONDS 1000000
 
 IID IID_ISampleGrabber;
 IID IID_ISampleGrabberCB;
@@ -366,7 +367,7 @@ VideoSourceWin::Start(
     }
 
     SAFE_RELEASE(pSrcFilter);
-
+    
     hr = pMC->Run();
     if (FAILED(hr)) return NS_ERROR_FAILURE;
 
@@ -394,6 +395,11 @@ VideoSourceWinCallback::VideoSourceWinCallback(
     output = pipe;
     vCanvas = ctx;
     m_refCount = 0;
+    
+    /* Establish baseline stream time with absolute time since epoch */
+    PRTime epoch_c = PR_Now();
+    epoch = (PRFloat64)(epoch_c / MICROSECONDS);
+    epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
 }
 
 STDMETHODIMP_(ULONG)
@@ -484,6 +490,15 @@ VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
         );
         rv = NS_DispatchToMainThread(render);
     }
+    
+    /* Write header: timestamp + length */
+    PRFloat64 current = epoch + Time;
+    rv = output->Write(
+        (const char *)&current, sizeof(PRFloat64), &wr
+    );
+    rv = output->Write(
+        (const char *)&isize, sizeof(PRUint32), &wr
+    );
     
     /* Write to pipe after converting to i420 */
     i420buf = (PRUint8 *)PR_Calloc(isize, sizeof(PRUint8));

@@ -58,6 +58,8 @@ protected:
     WAVEFORMATEX format;
     WAVEHDR	buffer[NUM_BUFFERS];
     
+    PRTime epoch;
+    PRIntervalTime start;
     nsIOutputStream *output;
     static DWORD WINAPI Callback(void *arg);
 

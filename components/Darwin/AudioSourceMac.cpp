@@ -115,7 +115,6 @@ AudioSourceMac::Start(nsIOutputStream *pipe)
     /* Establish baseline stream time with absolute time since epoch */
     PRTime epoch_c = PR_Now();
     start = Pa_GetStreamTime(stream);
-    
     epoch = (PRFloat64)(epoch_c / MICROSECONDS);
     epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
     

@@ -96,6 +96,7 @@ private:
     int h;
     int m_refCount;
     
+    PRFloat64 epoch;
     nsIOutputStream *output;
     nsIDOMCanvasRenderingContext2D *vCanvas;
     
@@ -124,7 +125,6 @@ protected:
 
     AM_MEDIA_TYPE *pMT;
     IAMStreamConfig *pConfig;
-
     VideoSourceWinCallback *cb;
 
 };

@@ -35,6 +35,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "AudioSourceWin.h"
+#define MICROSECONDS 1000000
 
 AudioSourceWin::AudioSourceWin(int c, int r)
     : AudioSource(c, r)
@@ -93,6 +94,12 @@ AudioSourceWin::Start(nsIOutputStream *pipe)
         }
     }
     
+    /* Establish baseline stream time with absolute time since epoch */
+    PRTime epoch_c = PR_Now();
+    start = PR_IntervalNow();
+    epoch = (PRFloat64)(epoch_c / MICROSECONDS);
+    epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
+    
     /* Go! */
     if (waveInStart(handle)) {
         PR_LOG(log, PR_LOG_ERROR, ("waveInStart failed with %d\n", err));
@@ -130,18 +137,37 @@ AudioSourceWin::Callback(void *data)
     MSG msg;
     nsresult rv;
     PRUint32 wr;
+    WAVEHDR *hdr;
     AudioSourceWin *asw = static_cast<AudioSourceWin*>(data);
+    
+    /* Calculate time delta 
+    PRUint64 delta = PR_IntervalToMilliseconds(
+        PR_IntervalNow() - asw->start
+    ) * 1000;
+    PRFloat64 current = asw->epoch + (PRFloat64)(delta/MICROSECONDS) +
+        ((PRFloat64)(delta % MICROSECONDS)) / MICROSECONDS;
+    */
+    PRFloat64 current = 0.0;
     
     /* This MSG comes from the audio driver */
     while (GetMessage(&msg, 0, 0, 0) == 1) {
         switch (msg.message) {
             case MM_WIM_DATA:
                 /* A buffer has been filled by the driver */
-                if (((WAVEHDR *)msg.lParam)->dwBytesRecorded) {
+                hdr = (WAVEHDR *)msg.lParam;
+                if (hdr->dwBytesRecorded) {
+                    /* Write timestamp and length */
+                    rv = asw->output->Write(
+                        (const char *)&current, sizeof(PRFloat64), &wr
+                    );
+                    rv = asw->output->Write(
+                        (const char *)&hdr->dwBytesRecorded, sizeof(PRUint32), &wr
+                    );
+    
                     /* Write samples to pipe */
                     rv = asw->output->Write(
                         (const char *)((WAVEHDR *)msg.lParam)->lpData,
-                        ((WAVEHDR *)msg.lParam)->dwBytesRecorded, &wr
+                        hdr->dwBytesRecorded, &wr
                     );
                 }
 

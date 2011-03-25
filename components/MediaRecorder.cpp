@@ -126,6 +126,8 @@ MediaRecorder::GetAudioPacket(PRInt32 *len, PRFloat64 *times)
     rv = aState->aPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = aState->aPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
     
+    //fprintf(stderr, "Got audio packet at %f\n", *times);
+    
     a_frames = (PRInt16 *) PR_Calloc(*len, sizeof(PRUint8));
     do aState->aPipeIn->Available(&rd);
         while ((rd < (PRUint32)*len) && !a_stp);
@@ -138,7 +140,7 @@ MediaRecorder::GetAudioPacket(PRInt32 *len, PRFloat64 *times)
     } else if (rd != (PRUint32)*len) {
         /* Hmm. I sure hope this is the end of the recording. */
         if (!a_stp) {
-            PR_LOG(mr->log, PR_LOG_NOTICE,
+            PR_LOG(log, PR_LOG_NOTICE,
                 ("only read %u of %d from audio pipe\n", rd, *len));
         }
         PR_Free(a_frames);
@@ -186,6 +188,8 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
     /* Get video frame header */
     rv = vState->vPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
+    
+    //fprintf(stderr, "Got video packet at %f\n", *times);
     
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);
@@ -320,6 +324,17 @@ multiplex:
             a_frames = NULL;
         }
         a_read = 0;
+        
+        /* Switch for no time-correction, temporary */
+        int short_circuit = 1;
+        if (short_circuit) {
+            v_frame = GetVideoPacket(&vlen, &vtime);
+            if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
+                goto finish;
+            }
+            PR_Free(v_frame); v_frame = NULL;
+            goto multiplex;
+        }
         
         /* Experience also suggests that the audio stream is more or less
          * consistent; so the question really is if we need to duplicate or
