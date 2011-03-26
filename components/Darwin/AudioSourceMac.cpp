@@ -111,13 +111,13 @@ AudioSourceMac::Start(nsIOutputStream *pipe)
         PR_LOG(log, PR_LOG_NOTICE, ("Could not open stream! %d", err));
         return NS_ERROR_FAILURE;
     }
-    
-    /* Establish baseline stream time with absolute time since epoch */
-    PRTime epoch_c = PR_Now();
-    start = Pa_GetStreamTime(stream);
-    epoch = (PRFloat64)(epoch_c / MICROSECONDS);
+	
+	PRUint32 wr;
+	PRTime epoch_c = PR_Now();
+    PRFloat64 epoch = (PRFloat64)(epoch_c / MICROSECONDS);
     epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
-    
+	pipe->Write((const char *)&epoch, sizeof(PRFloat64), &wr);
+	
     if (Pa_StartStream(stream) != paNoError) {
         PR_LOG(log, PR_LOG_NOTICE, ("Could not start stream!"));
         return NS_ERROR_FAILURE;
@@ -146,25 +146,10 @@ AudioSourceMac::Callback(const void *input, void *output,
     nsresult rv;
     PRUint32 wr;
     AudioSourceMac *asa = static_cast<AudioSourceMac*>(data);
-
-    /* WTF? Why is timeInfo->inputBufferAdcTime < asa->start?
-     * We take timeInfo->currentTime as the timestamp of the sample instead
-     */
-    double delta = timeInfo->currentTime - asa->start;
-    PRFloat64 current = asa->epoch + delta;
-    
-    /* Write header: timestamp + length */
-    PRUint32 length = frames * asa->GetFrameSize();
-    rv = asa->output->Write(
-        (const char *)&current, sizeof(PRFloat64), &wr
-    );
-    rv = asa->output->Write(
-        (const char *)&length, sizeof(PRUint32), &wr
-    );
     
     /* Write to pipe and return quickly */
     rv = asa->output->Write(
-        (const char *)input, length, &wr
+        (const char *)input, frames * asa->GetFrameSize(), &wr
     );
     
     return paContinue;

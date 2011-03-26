@@ -55,7 +55,4 @@ protected:
         const PaStreamCallbackTimeInfo* time,
         PaStreamCallbackFlags flags, void *data
     );
-
-    double start;
-    PRFloat64 epoch;
 };
