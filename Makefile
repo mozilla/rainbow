@@ -21,7 +21,7 @@ endif
 endif
 
 so_files=components/libmediarecorder.$(so)
-xpt_files=components/IMediaDevice.xpt
+xpt_files=components/IMediaRecorder.xpt
 
 xpi_name=rainbow-$(VERSION)-dev.xpi
 xpi_files=chrome.manifest install.rdf content/ $(so_files) $(xpt_files)

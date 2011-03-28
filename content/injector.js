@@ -84,40 +84,16 @@ var RainbowObserver = {
 
         sandbox.importFunction(function(loc, prop, ctx, obs) {
             rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.beginSession(prop, ctx, obs);
+                if (allowed) rainbow.recordToFile_verified(prop, ctx, obs);
                 else throw "Permission denied";
             });
-        }, "_beginSession");
+        }, "recStart");
         sandbox.importFunction(function(loc) {
             rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.beginRecord();
+                if (allowed) rainbow.stop_verified();
                 else throw "Permission denied";
             });
-        }, "_beginRecord");
-        sandbox.importFunction(function(loc) {
-            rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.pauseRecord();
-                else throw "Permission denied";
-            });
-        }, "_pauseRecord");
-        sandbox.importFunction(function(loc) {
-            rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.resumeRecord();
-                else throw "Permission denied";
-            });
-        }, "_resumeRecord");
-        sandbox.importFunction(function(loc) {
-            rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.endRecord();
-                else throw "Permission denied";
-            });
-        }, "_endRecord");
-        sandbox.importFunction(function(loc) {
-            rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.endSession();
-                else throw "Permission denied";
-            });
-        }, "_endSession");
+        }, "recStop");
 
         let toInject = getInjected();
         Components.utils.evalInSandbox(

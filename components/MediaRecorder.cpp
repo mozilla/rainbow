@@ -38,9 +38,9 @@
 #include "assert.h"
 
 #define MICROSECONDS 1000000
-#define TOLERANCE 0.100000
+#define TOLERANCE 0.010000
 
-NS_IMPL_ISUPPORTS1(MediaRecorder, IMediaDevice)
+NS_IMPL_ISUPPORTS1(MediaRecorder, IMediaRecorder)
 
 MediaRecorder *MediaRecorder::gMediaRecordingService = nsnull;
 MediaRecorder *
@@ -184,7 +184,7 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
     rv = vState->vPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
     
-    //fprintf(stderr, "Got %d video packets at %f\n", *len / vState->backend->GetFrameSize(), *times);
+    fprintf(stderr, "Got %d video packets at %f\n", *len / vState->backend->GetFrameSize(), *times);
     
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);
@@ -281,15 +281,20 @@ MediaRecorder::Encode()
      * run of the loop? Possible answer: No, because the timing might go
      * awry, we are better off processing timestamps per frame of video.
      */
+	nsresult rv;
+	PRUint32 rd;
     int v_fps = FPS_N / FPS_D;
     int a_frame_num = FRAMES_BUFFER;
     if (v_rec) {
         v_fps = vState->backend->GetFPSN() / vState->backend->GetFPSD();
         a_frame_num = params->rate/(v_fps);
     }
+    //int v_frame_size = vState->backend->GetFrameSize();
     int a_frame_size = aState->backend->GetFrameSize();
     int a_frame_total = a_frame_num * a_frame_size;
 	PRFloat64 v_frame_time_length = (PRFloat64)1.0 / static_cast<PRFloat64>(v_fps);
+	
+    //int a_frames_rec, v_frames_recorded;
 	
     PRUint8 *v_frame = NULL;
     PRInt16 *a_frames = NULL;
@@ -298,35 +303,22 @@ MediaRecorder::Encode()
 	PRUint8 *v_frame_future = NULL;
     PRUint8 *v_frame_most_recent = NULL;
 	
+    
     PRInt32 vlen;
 	PRBool is_first_video = PR_TRUE, should_end = PR_FALSE;
-    PRFloat64 delta, vtime = 0;
+    PRFloat64 atime, delta, current_audio_time = 0, vtime = 0;
     
-    for (;;) { // start main run loop
-        
-    if (!is_recording) {
-        /* If we are not recording, simply clean out the pipe.
-         * The backends are responsible for painting the preview.
-         */
-        if (!(a_frames = GetAudioPacket(a_frame_total))) {
-			should_end = PR_TRUE;
-			fprintf(stderr, "GetAudioPacket returned NULL\n");
-			goto video;
-		}
-        PR_Free(a_frames);
-        
-        if (!(v_frame_tmp = GetVideoPacket(&vlen, &vtime))) {
-            fprintf(stderr, "GetVideoPacket returned NULL\n");
-            goto finish;
-        }
-        PR_Free(v_frame_tmp);
-        safe_rec_stp = PR_TRUE;
-    } else if (v_rec && a_rec) {
+    if (v_rec && a_rec) {
         /* If video recording was requested, we started it first so it is
          * very likely that the video frame arrived first. This means we will
          * encode audio first and drop a few frames of video to align the
          * start times.
          */
+		rv = aState->aPipeIn->Read((char *)&atime, sizeof(PRFloat64), &rd);
+		fprintf(stderr, "Audio stream started at %f\n", atime);
+		current_audio_time = atime;
+		
+multiplex:
 		if (!(a_frames = GetAudioPacket(a_frame_total))) {
 			should_end = PR_TRUE;
 			fprintf(stderr, "GetAudioPacket returned NULL\n");
@@ -335,7 +327,7 @@ MediaRecorder::Encode()
 			if (EncodeAudio(a_frames, a_frame_total) == PR_FALSE) {
 				goto finish;
 			}
-			epoch += v_frame_time_length;
+			current_audio_time += v_frame_time_length;
 		}
 		PR_Free(a_frames);
         a_frames = NULL;
@@ -347,13 +339,13 @@ MediaRecorder::Encode()
          */
 video:
 		if (is_first_video) {
-			delta = vtime - epoch;
+			delta = vtime - atime;
 			while (delta < 0) {
 				if (v_frame_most_recent) {
 					PR_Free(v_frame_most_recent); v_frame_most_recent = NULL;
 				}
 				v_frame_most_recent = GetVideoPacket(&vlen, &vtime);
-				delta = vtime - epoch;
+				delta = vtime - atime;
 			}
 			
 			is_first_video = PR_FALSE;
@@ -366,11 +358,11 @@ video:
 			if (v_frame_future) {
 				v_frame_tmp = v_frame_future;
 				v_frame_future = NULL;
-				delta = vtime - epoch;
+				delta = vtime - current_audio_time;
 				if (delta < 0) delta = -delta;
 			} else {
 				v_frame_tmp = GetVideoPacket(&vlen, &vtime);
-				delta = vtime - epoch;
+				delta = vtime - current_audio_time;
 				assert(delta >= 0);
 			}
 			
@@ -391,10 +383,11 @@ video:
 				}
 				v_frame_future = v_frame_tmp;
 			}
-		} 
-		
+		}
+        
 		if (should_end)
 			return;
+		goto multiplex;
         
     } else if (v_rec && !a_rec) {
         for (;;) {
@@ -420,13 +413,10 @@ video:
         }
     }
     
-    } // end main run loop
-    
 finish:
-    safe_rec_stp = PR_TRUE;
     if (v_frame) PR_Free(v_frame);
     if (a_frames) PR_Free(a_frames);
-    return;
+    
 }
 
 
@@ -679,36 +669,47 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
 }
 
 /*
- * Begin a Rainbow session
+ * Start recording to file
  */
 NS_IMETHODIMP
-MediaRecorder::BeginSession(
+MediaRecorder::RecordToFile(
     nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
+    nsILocalFile *file,
     nsIMediaStateObserver *obs
 )
 {
+    nsresult rv;
+    ParseProperties(prop);
+    
     canvas = ctx;
     observer = obs;
-    ParseProperties(prop);
+    
+    /* Get a file stream from the local file */
+    nsCOMPtr<nsIFileOutputStream> stream(
+        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
+    );
+    pipeStream = do_QueryInterface(stream, &rv);
+    if (NS_FAILED(rv)) return rv;
+    rv = stream->Init(file, -1, -1, 0);
+    if (NS_FAILED(rv)) return rv;
 
     thread = PR_CreateThread(
         PR_SYSTEM_THREAD,
-        MediaRecorder::Begin, this,
+        MediaRecorder::Record, this,
         PR_PRIORITY_NORMAL,
         PR_GLOBAL_THREAD,
         PR_JOINABLE_THREAD, 0
     );
-
-    is_recording = PR_FALSE;
+    
     return NS_OK;
 }
 
 /*
- * Start session (called in a thread)
+ * Start recording (called in a thread)
  */
 void
-MediaRecorder::Begin(void *data)
+MediaRecorder::Record(void *data)
 {   
     nsresult rv;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
@@ -716,7 +717,7 @@ MediaRecorder::Begin(void *data)
     
     if (mr->a_rec || mr->v_rec) {
         NS_DispatchToMainThread(new MediaCallback(
-            mr->observer, "error", "session already in progress"
+            mr->observer, "error", "recording already in progress"
         ));
         return;
     }
@@ -763,6 +764,7 @@ MediaRecorder::Begin(void *data)
 
     /* Get ready for video! */
     if (params->video) {
+        mr->SetupTheoraBOS();
         rv = mr->MakePipe(
             getter_AddRefs(mr->vState->vPipeIn),
             getter_AddRefs(mr->vState->vPipeOut)
@@ -777,6 +779,7 @@ MediaRecorder::Begin(void *data)
 
     /* Get ready for audio! */
     if (params->audio) {
+        mr->SetupVorbisBOS();
         rv = mr->MakePipe(
             getter_AddRefs(mr->aState->aPipeIn),
             getter_AddRefs(mr->aState->aPipeOut)
@@ -791,6 +794,7 @@ MediaRecorder::Begin(void *data)
 
     /* Let's DO this. */
     if (params->video) {
+        mr->SetupTheoraHeaders();
         rv = mr->vState->backend->Start(mr->vState->vPipeOut, mr->canvas);
         if (NS_FAILED(rv)) {
             NS_DispatchToMainThread(new MediaCallback(
@@ -802,6 +806,7 @@ MediaRecorder::Begin(void *data)
         mr->v_stp = PR_FALSE;
     }
     if (params->audio) {
+        mr->SetupVorbisHeaders();
         rv = mr->aState->backend->Start(mr->aState->aPipeOut);
         if (NS_FAILED(rv)) {
             /* FIXME: Stop and clean up video! */
@@ -816,30 +821,30 @@ MediaRecorder::Begin(void *data)
 
     /* Start off encoder after notifying observer */
     NS_DispatchToMainThread(new MediaCallback(
-        mr->observer, "session-began", ""
+        mr->observer, "started", ""
     ));
     mr->Encode();
     return;
 }
 
 /*
- * End Session
+ * Stop recording
  */
 NS_IMETHODIMP
-MediaRecorder::EndSession()
+MediaRecorder::Stop()
 {
     if (!a_rec && !v_rec) {
         NS_DispatchToMainThread(new MediaCallback(
-            observer, "error", "no session in progress"
+            observer, "error", "no recording in progress"
         ));
         return NS_ERROR_FAILURE;
     }
 
     /* Return quickly and actually stop in a thread, notifying caller via
-     * the observer */
+     * the 'observer' */
     PR_CreateThread(
         PR_SYSTEM_THREAD,
-        MediaRecorder::End, this,
+        MediaRecorder::StopRecord, this,
         PR_PRIORITY_NORMAL,
         PR_GLOBAL_THREAD,
         PR_JOINABLE_THREAD, 0
@@ -849,9 +854,10 @@ MediaRecorder::EndSession()
 }
 
 void
-MediaRecorder::End(void *data)
+MediaRecorder::StopRecord(void *data)
 {
     nsresult rv;
+    PRUint32 wr;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
     
     if (mr->v_rec) {
@@ -888,127 +894,26 @@ MediaRecorder::End(void *data)
 
     if (mr->v_rec) {
         mr->vState->vPipeIn->Close();
+        th_encode_free(mr->vState->th);
+
+        /* Video trailer */
+        if (ogg_stream_flush(&mr->vState->os, &mr->vState->og)) {
+            rv = mr->WriteData(
+                mr->vState->og.header, mr->vState->og.header_len, &wr
+            );
+            rv = mr->WriteData(
+                mr->vState->og.body, mr->vState->og.body_len, &wr
+            );
+        }
+
+        ogg_stream_clear(&mr->vState->os);
         mr->v_rec = PR_FALSE;
     }
 
     if (mr->a_rec) {
         mr->aState->aPipeIn->Close();
-        mr->a_rec = PR_FALSE;
-    }
 
-    /* GG */
-    NS_DispatchToMainThread(new MediaCallback(
-        mr->observer, "session-ended", ""
-    ));
-    return;
-}
-
-/*
- * Start recording
- */
-NS_IMETHODIMP
-MediaRecorder::BeginRecord(nsILocalFile *file)
-{
-    /* Get a file stream from the local file */
-    nsresult rv;
-    nsCOMPtr<nsIFileOutputStream> stream(
-        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
-    );
-    pipeStream = do_QueryInterface(stream, &rv);
-    if (NS_FAILED(rv)) return rv;
-    rv = stream->Init(file, -1, -1, 0);
-    if (NS_FAILED(rv)) return rv;
-    
-    /* Note that the BOS has to come before regular headers */
-    if (params->audio)
-        SetupVorbisBOS();
-    if (params->video)
-        SetupTheoraBOS();
-    if (params->audio)
-        SetupVorbisHeaders();
-    if (params->video)
-        SetupTheoraHeaders();
-    
-    /* FIXME: This timestamp should come from backend, not here */
-    PRTime epoch_c = PR_Now();
-    epoch = (PRFloat64)(epoch_c / MICROSECONDS);
-    epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
-    
-    is_recording = PR_TRUE;
-    safe_rec_stp = PR_FALSE;
-    NS_DispatchToMainThread(new MediaCallback(
-        observer, "record-began", ""
-    ));
-    
-    return NS_OK;
-}
-
-/*
- * Pause recording
- */
-NS_IMETHODIMP
-MediaRecorder::PauseRecord()
-{
-    is_recording = PR_FALSE;
-    return NS_OK;
-}
-
-/*
- * Resume recording
- */
-NS_IMETHODIMP
-MediaRecorder::ResumeRecord()
-{
-    is_recording = PR_TRUE;
-    return NS_OK;
-}
-
-/*
- * Stop recording
- */
-NS_IMETHODIMP
-MediaRecorder::EndRecord()
-{
-    is_recording = PR_FALSE;
-    PR_CreateThread(
-        PR_SYSTEM_THREAD,
-        MediaRecorder::EndRecordThread, this,
-        PR_PRIORITY_NORMAL,
-        PR_GLOBAL_THREAD,
-        PR_JOINABLE_THREAD, 0
-    );
-    
-    return NS_OK;
-}
-
-void
-MediaRecorder::EndRecordThread(void *data)
-{
-    nsresult rv;
-    PRUint32 wr;
-    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
-    
-    /* Wait for the Encode method to set safe_rec_stp */
-    while (!mr->safe_rec_stp) {
-        PR_Sleep(PR_INTERVAL_MIN);
-    }
-    
-    /* Video trailer */
-    if (mr->v_rec) {
-        th_encode_free(mr->vState->th);
-        if (ogg_stream_flush(&mr->vState->os, &mr->vState->og)) {
-            rv = mr->WriteData(
-                mr->vState->og.header, mr->vState->og.header_len, &wr
-                );
-            rv = mr->WriteData(
-                mr->vState->og.body, mr->vState->og.body_len, &wr
-                );
-        }
-        ogg_stream_clear(&mr->vState->os);
-    }
-    
-    /* Audio trailer */
-    if (mr->a_rec) {
+        /* Audio trailer */
         vorbis_analysis_wrote(&mr->aState->vd, 0);
         mr->WriteAudio();
 
@@ -1017,10 +922,13 @@ MediaRecorder::EndRecordThread(void *data)
         vorbis_comment_clear(&mr->aState->vc);
         vorbis_info_clear(&mr->aState->vi);
         ogg_stream_clear(&mr->aState->os);
+        mr->a_rec = PR_FALSE;
     }
-    
+
+    /* GG */
     mr->pipeStream->Close();
     NS_DispatchToMainThread(new MediaCallback(
-        mr->observer, "record-ended", ""
+        mr->observer, "stopped", ""
     ));
+    return;
 }

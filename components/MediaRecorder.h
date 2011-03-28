@@ -37,7 +37,7 @@
 #ifndef MediaRecorder_h_
 #define MediaRecorder_h_
 
-#include "IMediaDevice.h"
+#include "IMediaRecorder.h"
 
 #include <ogg/ogg.h>
 #include <vorbis/vorbisenc.h>
@@ -75,7 +75,7 @@
 #include "VideoSourceCanvas.h"
 
 #define SOCK_LEN 8192
-#define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/device;1"
+#define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
 #define MEDIA_RECORDER_CID { 0xc467b1f4, 0x551c, 0x4e2f, \
                            { 0xa6, 0xba, 0xcb, 0x7d, 0x79, 0x2d, 0x14, 0x52 }}
 
@@ -113,11 +113,11 @@ typedef struct {
     PRUint32 fps_n, fps_d, width, height, rate, chan;
 } Properties;
 
-class MediaRecorder : public IMediaDevice
+class MediaRecorder : public IMediaRecorder
 {
 public:
     NS_DECL_ISUPPORTS
-    NS_DECL_IMEDIADEVICE
+    NS_DECL_IMEDIARECORDER
 
     nsresult Init();
     static MediaRecorder *GetSingleton();
@@ -128,10 +128,7 @@ protected:
     Audio *aState;
     Video *vState;
 
-    PRFloat64 epoch;
     PRThread *thread;
-    PRBool is_recording;
-    PRBool safe_rec_stp;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
@@ -144,10 +141,9 @@ protected:
     
     static MediaRecorder *gMediaRecordingService;
 
-    static void Begin(void *data);
-    static void End(void *data);
-    static void EndRecordThread(void *data);
-    
+    static void Record(void *data);
+    static void StopRecord(void *data);
+
     nsresult SetupTheoraBOS();
     nsresult SetupVorbisBOS();
     nsresult SetupTheoraHeaders();

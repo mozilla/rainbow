@@ -10,11 +10,13 @@
     <canvas id="tehcanvas" width="640" height="480"></canvas>
     <p><input type="button" id="tehbutton" value="Start!"/></p>
     <p id="tehmsg"></p>
+    <input type="file" id="tehfile" style="display:none;"></input>
 </body>
 <script type="application/javascript;version=1.8">
     let Re = false;
     let img = new Image();
     let msg = document.getElementById("tehmsg");
+    let fil = document.getElementById("tehfile");
     let but = document.getElementById("tehbutton");
     let ctx = document.getElementById("tehcanvas").getContext("2d");
 
@@ -25,13 +27,13 @@
 
     function onStateChange(type, arg) {
         switch (type) {
-            case "record-began":
+            case "started":
                 msg.innerHTML = "Recording has begun!";
                 break;
-            case "record-ended":
+            case "stopped":
                 // Recording stopped, but file not ready yet
                 break;
-            case "record-finished":
+            case "finished":
                 // File is now available
                 // arg is a DOM File, see
                 // https://developer.mozilla.org/en/Using_files_from_web_applications
@@ -48,7 +50,7 @@
     but.onclick = function() {
         if (Re) {
             // Stop recording
-            Me.endSession();
+            Me.stop();
             Re = false;
             but.value = "Start!";
             ctx.drawImage(img, 192, 112);
@@ -57,9 +59,9 @@
             Re = true;
             but.value = "Stop!";
             msg.innerHTML = "Loading...";
-            Me.beginSession({}, ctx, onStateChange);
-            Me.beginRecord();
+            Me.recordToFile({}, ctx, onStateChange);
         }
     }
 </script>
 </html>
+
