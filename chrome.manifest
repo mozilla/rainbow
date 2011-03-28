@@ -2,7 +2,7 @@ resource rainbow ./
 content rainbow content/
 overlay chrome://browser/content/browser.xul chrome://rainbow/content/browser.xul
 
-interfaces components/IMediaRecorder.xpt
+interfaces components/IMediaDevice.xpt
 binary-component components/libmediarecorder.dylib ABI=Darwin_x86-gcc3
 binary-component components/libmediarecorder.dll ABI=WINNT_x86-msvc
 binary-component components/libmediarecorder.so ABI=Linux_x86-gcc3

@@ -46,10 +46,14 @@ interface nsIMediaStateObserver : nsISupports
 };
 
 [scriptable, uuid(c467b1f4-551c-4e2f-a6ba-cb7d792d1452)]
-interface IMediaRecorder : nsISupports
+interface IMediaDevice : nsISupports
 {
-    void recordToFile(in nsIPropertyBag2 prop,
+    void beginSession(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
-        in nsILocalFile file, in nsIMediaStateObserver obs);
-    void stop();
+        in nsIMediaStateObserver obs);
+    void beginRecord(in nsILocalFile file);
+    void pauseRecord();
+    void resumeRecord();
+    void endRecord();
+    void endSession();
 };

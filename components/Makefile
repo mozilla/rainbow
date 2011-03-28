@@ -53,7 +53,7 @@ target = libmediarecorder
 so_target = $(target:=.$(so))
 
 # source and path configurations
-idl = IMediaRecorder.idl
+idl = IMediaDevice.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
     VideoSource.cpp $(os)/VideoSource$(teh).cpp \
     AudioSource.cpp $(os)/AudioSource$(teh).cpp \
