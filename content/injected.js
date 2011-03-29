@@ -3,11 +3,17 @@ if (window && window.navigator) {
     if (!window.navigator.service)
         window.navigator.service = {};
     window.navigator.service.media = {
-        recordToFile: function(params, ctx, obs) {
-            return recStart(window.location, params, ctx, obs);
+        beginSession: function(params, ctx, obs) {
+            return sessStart(window.location, params, ctx, obs);
         },
-        stop: function() {
+        beginRecording: function() {
+            return recStart(window.location);
+        },
+        endRecording: function() {
             return recStop(window.location);
+        },
+        endSession: function() {
+            return sessStop(window.location);
         }
     }
 }

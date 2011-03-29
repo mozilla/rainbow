@@ -48,6 +48,8 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function Rainbow() {
     this._input = null;
+    this._context = null;
+    this._session = false;
     this._recording = false;
 }
 Rainbow.prototype = {
@@ -66,7 +68,7 @@ Rainbow.prototype = {
                 getService(Ci.nsIPermissionManager);
     },
     
-    get _recorder() {
+    get _rainbow() {
         delete this._recorder;
         return this._recorder =
             Cc["@labs.mozilla.com/media/recorder;1"].
@@ -167,13 +169,30 @@ Rainbow.prototype = {
         }
     },
     
-    recordToFile_verified: function(prop, ctx, obs) {
-        if (this._recording)
-            throw "Recording already in progress";
+    beginSession: function(prop, ctx, obs) {
+        if (this._session)
+            throw "Session already in progress";
 
         // Make property bag
         let bag = this._makePropertyBag(prop);
-
+        
+        // Make sure observer is setup correctly, if none provided, ignore
+        if (obs) this._observer = obs;
+        else this._observer = function() {};
+        
+        this._context = ctx;
+        
+        // Start recording
+        this._rainbow.beginSession(bag, ctx, this._observer);
+        this._session = true;
+    },
+    
+    beginRecording: function() {
+        if (!this._session)
+            throw "Session is not in progress";
+        if (this._recording)
+            throw "Recording in progress";
+            
         // Create a file to dump to
         let file = Cc["@mozilla.org/file/directory_service;1"].  
             getService(Ci.nsIProperties).get("TmpD", Ci.nsILocalFile);
@@ -181,32 +200,35 @@ Rainbow.prototype = {
         file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, 0666);
 
         // Create dummy HTML <input> element to create DOMFile
-        let doc = ctx.canvas.ownerDocument;
+        let doc = this._context.canvas.ownerDocument;
         this._input = doc.createElement('input');
         this._input.type = 'file';
         this._input.mozSetFileNameArray([file.path], 1);
         
-        // Make sure observer is setup correctly, if none provided, ignore
-        if (obs) this._observer = obs;
-        else this._observer = function() {};
-        
-        // Start recording
-        this._recorder.recordToFile(bag, ctx, file, this._observer);
+        this._rainbow.beginRecording(file);
         this._recording = true;
     },
-
-    stop_verified: function() {
+    
+    endRecording: function() {
         if (!this._recording)
-            throw "No recording in progress";
-
-        this._recorder.stop();
+            throw "Recording is not in progress";
+        
+        this._rainbow.endRecording();
         this._recording = false;
-
         if (this._input) {
             let ret = this._input;
             this._input = null;
-            this._observer("finished", ret);
+            // FIXME: Can't send this yet, since record-ended may not have
+            // been done.
+            this._observer("record-finished", ret);
         }
+    },
+    
+    endSession: function() {
+        if (!this._session)
+            throw "No session in progress";
+        this._rainbow.endSession();
+        this._session = false;
     }
 };
 

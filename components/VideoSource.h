@@ -64,17 +64,24 @@ public:
     PRUint32 GetFPSN();
     PRUint32 GetFPSD();
 
-    /* Implement these two */
-    virtual nsresult Stop() = 0;
     /* Your implementation is responsible for painting a live preview on
-     * 'ctx' when Start() is called, and writing i420 samples to 'pipe'.
-     * You may use the helper class 'CanvasRenderer' for this purpose.
+     * 'ctx' when Start() is called. You may use the helper class
+     * 'CanvasRenderer' for this purpose.
      */
-    virtual nsresult Start(
-        nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx
-    ) = 0;
+    virtual nsresult Start(nsIDOMCanvasRenderingContext2D *ctx) = 0;
+    /* When this function is called, in addition to continue painting
+     * a preview on the canvas, you must write i420 sample to 'pipe'.
+     * It is an error to call StartRecording without a preceding Start call.
+     * When StopRecording is called, you should stop writing samples to the
+     * pipe (but continue painting a preview on canvas.)
+     */
+    virtual nsresult StartRecording(nsIOutputStream *pipe) = 0;
+    virtual nsresult StopRecording() = 0;
+    /* Stop writing samples to the pipe, as well as live preview and cleanup
+     * completely.
+     */
+    virtual nsresult Stop() = 0;
     
-
 protected:
     /* Zombie notifier */
     PRBool g2g;

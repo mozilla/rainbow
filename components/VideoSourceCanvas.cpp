@@ -51,21 +51,39 @@ VideoSourceCanvas::~VideoSourceCanvas()
 }
 
 nsresult
-VideoSourceCanvas::Start(
-    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
+VideoSourceCanvas::Start(nsIDOMCanvasRenderingContext2D *ctx)
 {
     if (!g2g)
         return NS_ERROR_FAILURE;
 
     vCanvas = ctx;
-    output = pipe;
+    return NS_OK;
+}
 
+nsresult
+VideoSourceCanvas::StartRecording(nsIOutputStream *pipe)
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+        
     /* Start a thread to sample canvas */
+    output = pipe;
     recording = PR_TRUE;
     sampler = PR_CreateThread(
         PR_SYSTEM_THREAD, VideoSourceCanvas::Grabber, this,
         PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD, PR_JOINABLE_THREAD, 0
     );
+    
+    return NS_OK;
+}
+
+nsresult
+VideoSourceCanvas::StopRecording()
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+    recording = PR_FALSE;
+    PR_JoinThread(sampler);
     return NS_OK;
 }
 
@@ -74,9 +92,6 @@ VideoSourceCanvas::Stop()
 {
     if (!g2g)
         return NS_ERROR_FAILURE;
-
-    recording = PR_FALSE;
-    PR_JoinThread(sampler);
     return NS_OK;
 }
 
@@ -108,4 +123,3 @@ VideoSourceCanvas::Grabber(void *data)
     PR_Free(rgb32);
     return;
 }
-

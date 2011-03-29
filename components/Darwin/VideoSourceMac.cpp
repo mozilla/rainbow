@@ -108,6 +108,7 @@ VideoSourceMac::VideoSourceMac(int w, int h)
     }
 
     vidcap_src_release(source);
+    is_rec = PR_FALSE;
     g2g = PR_TRUE;
 }
 
@@ -119,8 +120,7 @@ VideoSourceMac::~VideoSourceMac()
 }
 
 nsresult
-VideoSourceMac::Start(
-    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
+VideoSourceMac::Start(nsIDOMCanvasRenderingContext2D *ctx)
 {
     if (!g2g)
         return NS_ERROR_FAILURE;
@@ -141,7 +141,25 @@ VideoSourceMac::Start(
         return NS_ERROR_FAILURE;
     }
 
+    return NS_OK;
+}
+
+nsresult
+VideoSourceMac::StartRecording(nsIOutputStream *pipe)
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
     output = pipe;
+    is_rec = PR_TRUE;
+    return NS_OK;
+}
+
+nsresult
+VideoSourceMac::StopRecording()
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+    is_rec = PR_FALSE;
     return NS_OK;
 }
 
@@ -151,6 +169,7 @@ VideoSourceMac::Stop()
     if (!g2g)
         return NS_ERROR_FAILURE;
 
+    is_rec = PR_FALSE;
     if (vidcap_src_capture_stop(source)) {
         PR_LOG(log, PR_LOG_NOTICE, ("Failed vidcap_src_capture_stop\n"));
         return NS_ERROR_FAILURE;
@@ -171,26 +190,28 @@ VideoSourceMac::Callback(
     PRFloat64 current = (PRFloat64)video->capture_time_sec;
     current += ((PRFloat64)video->capture_time_usec / MICROSECONDS);
     
-    /* Write header: timestamp + length */
-    rv = vsm->output->Write(
-        (const char *)&current, sizeof(PRFloat64), &wr
-    );
-    rv = vsm->output->Write(
-        (const char *)&video->video_data_size, sizeof(PRUint32), &wr
-    );
+    if (vsm->is_rec) {
+        /* Write header: timestamp + length */
+        rv = vsm->output->Write(
+            (const char *)&current, sizeof(PRFloat64), &wr
+        );
+        rv = vsm->output->Write(
+            (const char *)&video->video_data_size, sizeof(PRUint32), &wr
+        );
+        /* Write data */
+        rv = vsm->output->Write(
+            (const char *)video->video_data, video->video_data_size, &wr
+        );
+    }
     
-    /* Write data */
-    rv = vsm->output->Write(
-        (const char *)video->video_data, video->video_data_size, &wr
-    );
-
     /* Write preview to canvas, if needed */
     int fsize = vsm->width * vsm->height * 4;
     if (vsm->vCanvas) {
         /* Convert i420 to RGB32 to write on canvas */
         nsAutoArrayPtr<PRUint8> rgb32(new PRUint8[fsize]);
         I420toRGB32(vsm->width, vsm->height,
-            (const char *)video->video_data, (char *)rgb32.get());
+            (const char *)video->video_data, (char *)rgb32.get()
+        );
 
         nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
             vsm->vCanvas, vsm->width, vsm->height, rgb32, fsize

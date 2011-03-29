@@ -129,6 +129,7 @@ protected:
     Video *vState;
 
     PRThread *thread;
+    PRBool m_session;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
@@ -141,8 +142,9 @@ protected:
     
     static MediaRecorder *gMediaRecordingService;
 
-    static void Record(void *data);
-    static void StopRecord(void *data);
+    static void BeginSessionThread(void *data);
+    static void BeginRecordingThread(void *data);
+    static void EndRecordingThread(void *data);
 
     nsresult SetupTheoraBOS();
     nsresult SetupVorbisBOS();

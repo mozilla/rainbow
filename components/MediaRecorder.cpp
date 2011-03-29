@@ -409,7 +409,7 @@ MediaRecorder::Init()
 {
     a_rec = PR_FALSE;
     v_rec = PR_FALSE;
-
+    m_session = PR_FALSE;
     log = PR_NewLogModule("MediaRecorder");
 
     pipeStream = nsnull;
@@ -650,58 +650,45 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
 }
 
 /*
- * Start recording to file
+ * Start rainbow session
  */
 NS_IMETHODIMP
-MediaRecorder::RecordToFile(
+MediaRecorder::BeginSession(
     nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsILocalFile *file,
     nsIMediaStateObserver *obs
 )
 {
-    nsresult rv;
-    ParseProperties(prop);
-    
     canvas = ctx;
     observer = obs;
+    ParseProperties(prop);
     
-    /* Get a file stream from the local file */
-    nsCOMPtr<nsIFileOutputStream> stream(
-        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
-    );
-    pipeStream = do_QueryInterface(stream, &rv);
-    if (NS_FAILED(rv)) return rv;
-    rv = stream->Init(file, -1, -1, 0);
-    if (NS_FAILED(rv)) return rv;
-
-    thread = PR_CreateThread(
+    if (m_session) {
+        NS_DispatchToMainThread(new MediaCallback(
+            observer, "error", "session already in progress"
+        ));
+        return NS_ERROR_FAILURE;
+    }
+    
+    PR_CreateThread(
         PR_SYSTEM_THREAD,
-        MediaRecorder::Record, this,
+        MediaRecorder::BeginSessionThread, this,
         PR_PRIORITY_NORMAL,
         PR_GLOBAL_THREAD,
         PR_JOINABLE_THREAD, 0
     );
-    
     return NS_OK;
 }
 
 /*
- * Start recording (called in a thread)
+ * Start session (called in a thread)
  */
 void
-MediaRecorder::Record(void *data)
+MediaRecorder::BeginSessionThread(void *data)
 {   
     nsresult rv;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
     Properties *params = mr->params;
-    
-    if (mr->a_rec || mr->v_rec) {
-        NS_DispatchToMainThread(new MediaCallback(
-            mr->observer, "error", "recording already in progress"
-        ));
-        return;
-    }
 
     /* Setup backends */
     #ifdef RAINBOW_Mac
@@ -743,8 +730,101 @@ MediaRecorder::Record(void *data)
         return;
     }
 
-    /* Get ready for video! */
+    /* Let's DO this. */
     if (params->video) {
+        rv = mr->vState->backend->Start(mr->canvas);
+        if (NS_FAILED(rv)) {
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not start video session"
+            ));
+            return;
+        }
+    }
+    /* No preview for audio */
+
+    mr->m_session = PR_TRUE;
+    NS_DispatchToMainThread(new MediaCallback(
+        mr->observer, "session-began", ""
+    ));
+    return;
+}
+
+/*
+ * End session
+ */
+NS_IMETHODIMP
+MediaRecorder::EndSession()
+{
+    nsresult rv;
+    if (!m_session) {
+        NS_DispatchToMainThread(new MediaCallback(
+            observer, "error", "no session in progress"
+        ));
+        return NS_ERROR_FAILURE;
+    }
+    
+    if (a_rec || v_rec) {
+        NS_DispatchToMainThread(new MediaCallback(
+            observer, "error", "recording in progress"
+        ));
+        return NS_ERROR_FAILURE;
+    }
+    
+    /* End video, audio doesn't need to be */
+    rv = vState->backend->Stop();
+    if (NS_FAILED(rv)) {
+        NS_DispatchToMainThread(new MediaCallback(
+            observer, "error", "could not stop video session"
+        ));
+        return NS_ERROR_FAILURE;
+    }
+    
+    m_session = PR_FALSE;
+    NS_DispatchToMainThread(new MediaCallback(
+        observer, "session-ended", ""
+    ));
+    
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+MediaRecorder::BeginRecording(nsILocalFile *file)
+{
+    /* Get a file stream from the local file */
+    nsresult rv;
+    nsCOMPtr<nsIFileOutputStream> stream(
+        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
+    );
+    pipeStream = do_QueryInterface(stream, &rv);
+    if (NS_FAILED(rv)) return rv;
+    rv = stream->Init(file, -1, -1, 0);
+    if (NS_FAILED(rv)) return rv;
+    
+    if (a_rec || v_rec) {
+        NS_DispatchToMainThread(new MediaCallback(
+            observer, "error", "recording already in progress"
+        ));
+        return NS_ERROR_FAILURE;
+    }
+    
+    thread = PR_CreateThread(
+        PR_SYSTEM_THREAD,
+        MediaRecorder::BeginRecordingThread, this,
+        PR_PRIORITY_NORMAL,
+        PR_GLOBAL_THREAD,
+        PR_JOINABLE_THREAD, 0
+    );
+    return NS_OK;
+}
+
+void
+MediaRecorder::BeginRecordingThread(void *data)
+{
+    nsresult rv;
+    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
+    
+    /* Get ready for video! */
+    if (mr->params->video) {
         mr->SetupTheoraBOS();
         rv = mr->MakePipe(
             getter_AddRefs(mr->vState->vPipeIn),
@@ -759,7 +839,7 @@ MediaRecorder::Record(void *data)
     }
 
     /* Get ready for audio! */
-    if (params->audio) {
+    if (mr->params->audio) {
         mr->SetupVorbisBOS();
         rv = mr->MakePipe(
             getter_AddRefs(mr->aState->aPipeIn),
@@ -772,21 +852,15 @@ MediaRecorder::Record(void *data)
             return;
         }
     }
-
-    /* Let's DO this. */
-    if (params->video) {
-        mr->SetupTheoraHeaders();
-        rv = mr->vState->backend->Start(mr->vState->vPipeOut, mr->canvas);
-        if (NS_FAILED(rv)) {
-            NS_DispatchToMainThread(new MediaCallback(
-                mr->observer, "error", "internal: could not start video recording"
-            ));
-            return;
-        }
+    
+    if (mr->params->video) {
         mr->v_rec = PR_TRUE;
         mr->v_stp = PR_FALSE;
+        mr->SetupTheoraHeaders();
+        mr->vState->backend->StartRecording(mr->vState->vPipeOut);
     }
-    if (params->audio) {
+
+    if (mr->params->audio) {
         mr->SetupVorbisHeaders();
         rv = mr->aState->backend->Start(mr->aState->aPipeOut);
         if (NS_FAILED(rv)) {
@@ -799,20 +873,19 @@ MediaRecorder::Record(void *data)
         mr->a_rec = PR_TRUE;
         mr->a_stp = PR_FALSE;
     }
-
+    
     /* Start off encoder after notifying observer */
     NS_DispatchToMainThread(new MediaCallback(
-        mr->observer, "started", ""
+        mr->observer, "record-began", ""
     ));
     mr->Encode();
-    return;
 }
 
 /*
- * Stop recording
+ * End recording
  */
 NS_IMETHODIMP
-MediaRecorder::Stop()
+MediaRecorder::EndRecording()
 {
     if (!a_rec && !v_rec) {
         NS_DispatchToMainThread(new MediaCallback(
@@ -820,29 +893,29 @@ MediaRecorder::Stop()
         ));
         return NS_ERROR_FAILURE;
     }
-
-    /* Return quickly and actually stop in a thread, notifying caller via
-     * the 'observer' */
+    
     PR_CreateThread(
         PR_SYSTEM_THREAD,
-        MediaRecorder::StopRecord, this,
+        MediaRecorder::EndRecordingThread, this,
         PR_PRIORITY_NORMAL,
         PR_GLOBAL_THREAD,
         PR_JOINABLE_THREAD, 0
     );
-    
     return NS_OK;
 }
 
+/*
+ * End recording (called in a thread)
+ */
 void
-MediaRecorder::StopRecord(void *data)
+MediaRecorder::EndRecordingThread(void *data)
 {
     nsresult rv;
     PRUint32 wr;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
     
     if (mr->v_rec) {
-        rv = mr->vState->backend->Stop();
+        rv = mr->vState->backend->StopRecording();
         if (NS_FAILED(rv)) {
             NS_DispatchToMainThread(new MediaCallback(
                 mr->observer, "error", "could not stop video recording"
@@ -909,7 +982,7 @@ MediaRecorder::StopRecord(void *data)
     /* GG */
     mr->pipeStream->Close();
     NS_DispatchToMainThread(new MediaCallback(
-        mr->observer, "stopped", ""
+        mr->observer, "record-ended", ""
     ));
     return;
 }

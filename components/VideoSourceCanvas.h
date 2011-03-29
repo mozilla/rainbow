@@ -46,7 +46,9 @@ public:
     ~VideoSourceCanvas();
 
     nsresult Stop();
-    nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
+    nsresult Start(nsIDOMCanvasRenderingContext2D *ctx);
+    nsresult StartRecording(nsIOutputStream *pipe);
+    nsresult StopRecording();
 
 protected:
     PRBool recording;

@@ -27,13 +27,19 @@
 
     function onStateChange(type, arg) {
         switch (type) {
-            case "started":
+            case "session-began":
+                Me.beginRecording();
+                break;
+            case "record-began":
                 msg.innerHTML = "Recording has begun!";
                 break;
-            case "stopped":
-                // Recording stopped, but file not ready yet
+            case "record-ended":
+                // Recording stopped, but file may not ready yet
+                Me.endSession();
+                but.value = "Start!";
+                ctx.drawImage(img, 192, 112);
                 break;
-            case "finished":
+            case "record-finished":
                 // File is now available
                 // arg is a DOM File, see
                 // https://developer.mozilla.org/en/Using_files_from_web_applications
@@ -50,16 +56,14 @@
     but.onclick = function() {
         if (Re) {
             // Stop recording
-            Me.stop();
+            Me.endRecording();
             Re = false;
-            but.value = "Start!";
-            ctx.drawImage(img, 192, 112);
         } else {
             // Start recording
             Re = true;
             but.value = "Stop!";
             msg.innerHTML = "Loading...";
-            Me.recordToFile({}, ctx, onStateChange);
+            Me.beginSession({}, ctx, onStateChange);
         }
     }
 </script>
