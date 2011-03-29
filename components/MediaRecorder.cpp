@@ -38,7 +38,7 @@
 #include "assert.h"
 
 #define MICROSECONDS 1000000
-#define TOLERANCE 0.010000
+#define TOLERANCE 0.050000
 
 NS_IMPL_ISUPPORTS1(MediaRecorder, IMediaRecorder)
 
@@ -281,55 +281,55 @@ MediaRecorder::Encode()
      * run of the loop? Possible answer: No, because the timing might go
      * awry, we are better off processing timestamps per frame of video.
      */
-	nsresult rv;
-	PRUint32 rd;
+    nsresult rv;
+    PRUint32 rd;
     int v_fps = FPS_N / FPS_D;
     int a_frame_num = FRAMES_BUFFER;
     if (v_rec) {
         v_fps = vState->backend->GetFPSN() / vState->backend->GetFPSD();
         a_frame_num = params->rate/(v_fps);
     }
-    //int v_frame_size = vState->backend->GetFrameSize();
     int a_frame_size = aState->backend->GetFrameSize();
     int a_frame_total = a_frame_num * a_frame_size;
-	PRFloat64 v_frame_time_length = (PRFloat64)1.0 / static_cast<PRFloat64>(v_fps);
-	
-    //int a_frames_rec, v_frames_recorded;
-	
+    PRFloat64 v_frame_time_length = (PRFloat64)1.0 / static_cast<PRFloat64>(v_fps);
+    
     PRUint8 *v_frame = NULL;
     PRInt16 *a_frames = NULL;
-	
-	PRUint8 *v_frame_tmp = NULL;
-	PRUint8 *v_frame_future = NULL;
     PRUint8 *v_frame_most_recent = NULL;
-	
     
     PRInt32 vlen;
-	PRBool is_first_video = PR_TRUE, should_end = PR_FALSE;
+    PRBool should_end = PR_FALSE;
     PRFloat64 atime, delta, current_audio_time = 0, vtime = 0;
     
     if (v_rec && a_rec) {
-        /* If video recording was requested, we started it first so it is
-         * very likely that the video frame arrived first. This means we will
-         * encode audio first and drop a few frames of video to align the
-         * start times.
-         */
-		rv = aState->aPipeIn->Read((char *)&atime, sizeof(PRFloat64), &rd);
-		fprintf(stderr, "Audio stream started at %f\n", atime);
-		current_audio_time = atime;
-		
+        /* Check if audio or video started first, and set that as baseline */
+        rv = aState->aPipeIn->Read((char *)&atime, sizeof(PRFloat64), &rd);
+        fprintf(stderr, "Audio stream started at %f\n", atime);
+        if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
+            fprintf(stderr, "GetVideoPacket returned NULL\n");
+            goto finish;
+        }
+        fprintf(stderr, "Video stream started at %f\n", vtime);
+        
+        while (vtime > atime) {
+            /* Fast forward audio to catch up with video */
+            PR_Free(GetAudioPacket(a_frame_total));
+            atime += v_frame_time_length;
+        }
+        current_audio_time = atime;
+        
 multiplex:
-		if (!(a_frames = GetAudioPacket(a_frame_total))) {
-			should_end = PR_TRUE;
-			fprintf(stderr, "GetAudioPacket returned NULL\n");
-			goto video;
-		} else {
-			if (EncodeAudio(a_frames, a_frame_total) == PR_FALSE) {
-				goto finish;
-			}
-			current_audio_time += v_frame_time_length;
-		}
-		PR_Free(a_frames);
+        if (!(a_frames = GetAudioPacket(a_frame_total))) {
+            should_end = PR_TRUE;
+            fprintf(stderr, "GetAudioPacket returned NULL\n");
+            goto video;
+        } else {
+            if (EncodeAudio(a_frames, a_frame_total) == PR_FALSE) {
+                goto finish;
+            }
+            current_audio_time += v_frame_time_length;
+        }
+        PR_Free(a_frames);
         a_frames = NULL;
         
         /* Experience also suggests that the audio stream is more or less
@@ -338,56 +338,36 @@ multiplex:
          * we drop all packets until we reach timestamp indicated by audio.
          */
 video:
-		if (is_first_video) {
-			delta = vtime - atime;
-			while (delta < 0) {
-				if (v_frame_most_recent) {
-					PR_Free(v_frame_most_recent); v_frame_most_recent = NULL;
-				}
-				v_frame_most_recent = GetVideoPacket(&vlen, &vtime);
-				delta = vtime - atime;
-			}
-			
-			is_first_video = PR_FALSE;
-			if (EncodeVideo(v_frame_most_recent, vlen) == PR_FALSE) {
-				goto finish;
-			}
-			
-		} else {
-			
-			if (v_frame_future) {
-				v_frame_tmp = v_frame_future;
-				v_frame_future = NULL;
-				delta = vtime - current_audio_time;
-				if (delta < 0) delta = -delta;
-			} else {
-				v_frame_tmp = GetVideoPacket(&vlen, &vtime);
-				delta = vtime - current_audio_time;
-				assert(delta >= 0);
-			}
-			
-			if (delta < TOLERANCE) {
-				/* This video frame appeared right after the audio frame, but
-				 * within our tolerance levels, so we encode it and keep a
-				 * copy in case we need to duplicate it on the next run
-				 */
-				if (v_frame_most_recent) PR_Free(v_frame_most_recent);
-				v_frame_most_recent = v_frame_tmp;
-				if (EncodeVideo(v_frame_most_recent, vlen) == PR_FALSE) {
-					goto finish;
-				}
-			} else {
-				/* Frame we got was too late, so re-use our old one */
-				if (EncodeVideo(v_frame_most_recent, vlen) == PR_FALSE) {
-					goto finish;
-				}
-				v_frame_future = v_frame_tmp;
-			}
-		}
+        delta = vtime - current_audio_time;
+        while (delta < 0) {
+            if (v_frame) {
+                PR_Free(v_frame); v_frame = NULL;
+            }
+            if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
+                fprintf(stderr, "GetVideoPacket returned NULL\n");
+            }
+            delta = vtime - current_audio_time;
+        }
         
-		if (should_end)
-			return;
-		goto multiplex;
+        if (delta < TOLERANCE) {
+            /* This video frame appeared right after the audio frame, but
+             * within our tolerance levels, so we encode it and keep a
+             * copy in case we need to duplicate it on the next run
+             */
+            v_frame_most_recent = v_frame;
+        }
+        /* Frame we got was too late, so re-use our old one. If none is
+         * available, just drop.
+         */
+        if (v_frame_most_recent) {
+            if (EncodeVideo(v_frame_most_recent, vlen) == PR_FALSE) {
+                goto finish;
+            }
+        }
+        
+        if (should_end)
+            return;
+        goto multiplex;
         
     } else if (v_rec && !a_rec) {
         for (;;) {
@@ -401,15 +381,16 @@ video:
             PR_Free(v_frame); v_frame = NULL;
         }
     } else if (a_rec && !v_rec) {
+        rv = aState->aPipeIn->Read((char *)&atime, sizeof(PRFloat64), &rd);
         for (;;) {
-			if (!(a_frames = GetAudioPacket(a_frame_total))) {
+            if (!(a_frames = GetAudioPacket(a_frame_total))) {
                 goto finish;
             } else {
-				if (EncodeAudio(a_frames, a_frame_total) == PR_FALSE) {
+                if (EncodeAudio(a_frames, a_frame_total) == PR_FALSE) {
                 goto finish;
                 }
-			}
-			PR_Free(a_frames); a_frames = NULL;
+            }
+            PR_Free(a_frames); a_frames = NULL;
         }
     }
     
