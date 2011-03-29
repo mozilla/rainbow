@@ -180,11 +180,49 @@ Rainbow.prototype = {
         if (obs) this._observer = obs;
         else this._observer = function() {};
         
+        // Create dummy HTML <input> element to create DOMFile(s)
         this._context = ctx;
+        let doc = this._context.canvas.ownerDocument;
+        this._input = doc.createElement('input');
+        this._input.type = 'file';
         
-        // Start recording
+        // Start rainbow session
         this._rainbow.beginSession(bag, ctx, this._observer);
         this._session = true;
+    },
+    
+    fetchImage: function(isFile) {
+        if (!this._session)
+            throw "No session in progress";
+            
+        // fetch data url from canvas
+        let data = this._context.canvas.toDataURL("image/png", "");
+        if (!isFile) {
+            return data;
+        }
+        
+        // create URIs of the source and targets
+        let file = Cc["@mozilla.org/file/directory_service;1"].  
+            getService(Ci.nsIProperties).get("TmpD", Ci.nsILocalFile);
+        file.append("rainbow.png");
+        file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, 0666);
+        let io = Cc["@mozilla.org/network/io-service;1"]
+                 .getService(Ci.nsIIOService);
+        let source = io.newURI(data, "UTF8", null);
+        let target = io.newFileURI(file);
+
+        // prepare to save the canvas data
+        let persist = Cc["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"]
+                      .createInstance(Ci.nsIWebBrowserPersist);
+        persist.persistFlags =
+            Ci.nsIWebBrowserPersist.PERSIST_FLAGS_REPLACE_EXISTING_FILES;
+        persist.persistFlags |=
+            Ci.nsIWebBrowserPersist.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
+
+        // save the canvas data to the file
+        persist.saveURI(source, null, null, null, null, file);
+        this._input.mozSetFileNameArray([file.path], 1);
+        return this._input;
     },
     
     beginRecording: function() {
@@ -199,12 +237,7 @@ Rainbow.prototype = {
         file.append("rainbow.ogg");
         file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, 0666);
 
-        // Create dummy HTML <input> element to create DOMFile
-        let doc = this._context.canvas.ownerDocument;
-        this._input = doc.createElement('input');
-        this._input.type = 'file';
         this._input.mozSetFileNameArray([file.path], 1);
-        
         this._rainbow.beginRecording(file);
         this._recording = true;
     },
@@ -216,11 +249,7 @@ Rainbow.prototype = {
         this._rainbow.endRecording();
         this._recording = false;
         if (this._input) {
-            let ret = this._input;
-            this._input = null;
-            // FIXME: Can't send this yet, since record-ended may not have
-            // been done.
-            this._observer("record-finished", ret);
+            return this._input;
         }
     },
     

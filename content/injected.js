@@ -14,6 +14,9 @@ if (window && window.navigator) {
         },
         endSession: function() {
             return sessStop(window.location);
+        },
+        fetchImage: function(isFile) {
+            return fetchImg(window.location, isFile);
         }
     }
 }

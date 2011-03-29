@@ -95,10 +95,12 @@ var RainbowObserver = {
             });
         }, "recStart");
         sandbox.importFunction(function(loc) {
+            let ret;
             rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.endRecording();
+                if (allowed) ret = rainbow.endRecording();
                 else throw "Permission denied";
             });
+            return ret;
         }, "recStop");
         sandbox.importFunction(function(loc) {
             rainbow._verifyPermission(window, loc, function(allowed) {
@@ -106,7 +108,15 @@ var RainbowObserver = {
                 else throw "Permission denied";
             });
         }, "sessStop");
-
+        sandbox.importFunction(function(loc, isFile) {
+            let ret;
+            rainbow._verifyPermission(window, loc, function(allowed) {
+                if (allowed) ret = rainbow.fetchImage(isFile);
+                else throw "Permission denied";
+            });
+            return ret;
+        }, "fetchImg");
+        
         let toInject = getInjected();
         Components.utils.evalInSandbox(
             toInject, sandbox, "1.8", this.SCRIPT_TO_INJECT_URI, 1
