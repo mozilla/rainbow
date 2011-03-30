@@ -184,7 +184,7 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
     rv = vState->vPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
     
-    fprintf(stderr, "Got %d video packets at %f\n", *len / vState->backend->GetFrameSize(), *times);
+    //fprintf(stderr, "Got %d video packets at %f\n", *len / vState->backend->GetFrameSize(), *times);
     
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);

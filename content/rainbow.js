@@ -249,7 +249,9 @@ Rainbow.prototype = {
         this._rainbow.endRecording();
         this._recording = false;
         if (this._input) {
-            return this._input;
+            let ret = this._input;
+            this._input = null;
+            this._observer("record-finished", ret);
         }
     },
     
