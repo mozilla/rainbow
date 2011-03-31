@@ -36,6 +36,7 @@
             case "record-ended":
                 // Recording stopped, but file may not ready yet
                 Me.endSession();
+                Re = false;
                 but.value = "Start!";
                 ctx.drawImage(img, 192, 112);
                 break;
@@ -57,7 +58,6 @@
         if (Re) {
             // Stop recording
             Me.endRecording();
-            Re = false;
         } else {
             // Start recording
             Re = true;

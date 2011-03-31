@@ -192,8 +192,8 @@ Rainbow.prototype = {
     },
     
     fetchImage: function(isFile) {
-        if (!this._session)
-            throw "No session in progress";
+        if (!this._context)
+            throw "Session is missing a canvas context!";
             
         // fetch data url from canvas
         let data = this._context.canvas.toDataURL("image/png", "");
@@ -221,6 +221,12 @@ Rainbow.prototype = {
 
         // save the canvas data to the file
         persist.saveURI(source, null, null, null, null, file);
+        
+        if (!this._input) {
+            this._input =
+                this._context.canvas.ownerDocument.createElement('input');
+            this._input.type = 'file';
+        }
         this._input.mozSetFileNameArray([file.path], 1);
         return this._input;
     },
