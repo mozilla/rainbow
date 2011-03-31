@@ -75,7 +75,7 @@ public:
     }
     
 private:
-    nsIMediaStateObserver *m_Obs;
+    nsCOMPtr<nsIMediaStateObserver> m_Obs;
     char m_Msg[128]; char m_Arg[256];
 };
 
