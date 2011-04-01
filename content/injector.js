@@ -74,6 +74,19 @@ var RainbowObserver = {
     ]),
 
     observe: function(subject, topic, data) {
+        // Check if XPCOM component is loaded, don't bother injecting if
+        // absent (most likely FF is in 64-bit mode)
+        try {
+            let i = Components.classes["@labs.mozilla.com/media/recorder;1"].
+                getService(Components.interfaces.IMediaRecorder);
+        } catch(e) {
+            Components.classes["@mozilla.org/consoleservice;1"].
+                getService(Components.interfaces.nsIConsoleService).
+                reportError("Rainbow could not load component, are you in " +
+                "32-bit mode?");
+            return;
+        }
+        
         // We inject on all domains, permission checks are performed
         // on-call in rainbow.js
         let sandbox = new Components.utils.Sandbox(
