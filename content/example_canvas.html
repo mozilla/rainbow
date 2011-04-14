@@ -12,34 +12,60 @@
     <canvas id="blob" width="640" height="480"></canvas>
     <p><input type="button" id="tehbutton" value="Start!"/></p>
     <p id="tehmsg"></p>
-    <input type="file" id="tehfile" style="display:none;"></input>
 </body>
 <script type="application/javascript;version=1.8">
-    let Sr, Fi;
     let Re = false;
     let msg = document.getElementById("tehmsg");
-    let fil = document.getElementById("tehfile");
     let but = document.getElementById("tehbutton");
     let ctx = document.getElementById("blob").getContext("2d");
 
+    function onStateChange(type, arg) {
+        switch (type) {
+            case "session-began":
+                Re = true;
+                but.value = "Stop!";
+                but.disabled = false;
+                Me.beginRecording();
+                break;
+            case "record-began":
+                msg.innerHTML = "Recording has begun!";
+                break;
+            case "record-ended":
+                // Recording stopped, but file may not ready yet
+                Me.endSession();
+                Re = false;
+                but.value = "Start!";
+                but.disabled = false;
+                break;
+            case "record-finished":
+                // File is now available
+                // arg is a DOM File, see
+                // https://developer.mozilla.org/en/Using_files_from_web_applications
+                msg.innerHTML = "Your video was named: " +
+                    arg.files.item(0).fileName + " and is " +
+                    arg.files.item(0).fileSize + " bytes big!";
+                break;
+            case "session-ended":
+                // Ignore
+                break;
+            case "error":
+                msg.innerHTML = "There was an error :( " + type + " :: " + arg;
+                break;
+        }
+    }
+    
     but.onclick = function() {
         if (Re) {
             // Stop recording
-            Fi = Sr.stop();
-            Re = false;
-            but.value = "Start!";
-
-            msg.innerHTML = "Your video was named: " +
-                Fi.files.item(0).fileName + " and is " +
-                Fi.files.item(0).fileSize + " bytes big!";
+            Me.endRecording();
+            but.disabled = true;
         } else {
             // Start recording
-            Re = true;
-            but.value = "Stop!";
-            msg.innerHTML = " ";
-            Sr = Me.recordToFile({
-                "width": 640, "height": 480, "source": true
-            }, ctx);
+            msg.innerHTML = "Loading...";
+            but.disabled = true;
+            Me.beginSession({
+                "audio": false, "width": 640, "height": 480, "source": true
+            }, ctx, onStateChange);
         }
     }
 </script>

@@ -370,24 +370,26 @@ video:
         goto multiplex;
         
     } else if (v_rec && !a_rec) {
-        for (;;) {
+        while (!v_stp) {
             if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
-                goto finish;
+                continue;
             } else {
                 if (EncodeVideo(v_frame, vlen) == PR_FALSE) {
-                    goto finish;
+                    PR_Free(v_frame); v_frame = NULL;
+                    continue;
                 }
             }
             PR_Free(v_frame); v_frame = NULL;
         }
     } else if (a_rec && !v_rec) {
         rv = aState->aPipeIn->Read((char *)&atime, sizeof(PRFloat64), &rd);
-        for (;;) {
+        while (!a_stp) {
             if (!(a_frames = GetAudioPacket(a_frame_total))) {
-                goto finish;
+                continue;
             } else {
                 if (EncodeAudio(a_frames, a_frame_total) == PR_FALSE) {
-                goto finish;
+                    PR_Free(a_frames); a_frames = NULL;
+                    continue;
                 }
             }
             PR_Free(a_frames); a_frames = NULL;

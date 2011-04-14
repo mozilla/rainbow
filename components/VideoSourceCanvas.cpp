@@ -43,7 +43,7 @@ VideoSourceCanvas::VideoSourceCanvas(int w, int h)
     fps_n = 30;
     fps_d = 1;
     g2g = PR_TRUE;
-    recording = PR_FALSE;
+    running = PR_FALSE;
 }
 
 VideoSourceCanvas::~VideoSourceCanvas()
@@ -57,33 +57,11 @@ VideoSourceCanvas::Start(nsIDOMCanvasRenderingContext2D *ctx)
         return NS_ERROR_FAILURE;
 
     vCanvas = ctx;
-    return NS_OK;
-}
-
-nsresult
-VideoSourceCanvas::StartRecording(nsIOutputStream *pipe)
-{
-    if (!g2g)
-        return NS_ERROR_FAILURE;
-        
-    /* Start a thread to sample canvas */
-    output = pipe;
-    recording = PR_TRUE;
+    running = PR_TRUE;
     sampler = PR_CreateThread(
         PR_SYSTEM_THREAD, VideoSourceCanvas::Grabber, this,
         PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD, PR_JOINABLE_THREAD, 0
     );
-    
-    return NS_OK;
-}
-
-nsresult
-VideoSourceCanvas::StopRecording()
-{
-    if (!g2g)
-        return NS_ERROR_FAILURE;
-    recording = PR_FALSE;
-    PR_JoinThread(sampler);
     return NS_OK;
 }
 
@@ -92,6 +70,9 @@ VideoSourceCanvas::Stop()
 {
     if (!g2g)
         return NS_ERROR_FAILURE;
+    
+    running = PR_FALSE;
+    PR_JoinThread(sampler);
     return NS_OK;
 }
 
@@ -107,15 +88,21 @@ VideoSourceCanvas::Grabber(void *data)
     char *i420 = (char *)PR_Calloc(isize, 1);
     PRUint8 *rgb32 = (PRUint8 *)PR_Calloc(fsize, 1);
 
+    PRFloat64 epoch = 0.0;
     PRIntervalTime ticks = PR_TicksPerSecond() / 30;
-    while (vs->recording) {
+    while (vs->running) {
         PR_Sleep(ticks);
+        if (vs->is_rec == PR_FALSE) continue;
+        
         rv = vs->vCanvas->GetImageData_explicit(
             0, 0, vs->width, vs->height, rgb32, fsize
         );
         if (NS_FAILED(rv)) continue;
 
         RGB32toI420(vs->width, vs->height, (const char *)rgb32, i420);
+        
+        rv = vs->output->Write((const char *)&epoch, sizeof(PRFloat64), &wr);
+        rv = vs->output->Write((const char *)&isize, sizeof(PRUint32), &wr);
         rv = vs->output->Write((const char *)i420, isize, &wr);
     }
 

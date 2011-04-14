@@ -10,13 +10,11 @@
     <canvas id="tehcanvas" width="640" height="480"></canvas>
     <p><input type="button" id="tehbutton" value="Start!"/></p>
     <p id="tehmsg"></p>
-    <input type="file" id="tehfile" style="display:none;"></input>
 </body>
 <script type="application/javascript;version=1.8">
     let Re = false;
     let img = new Image();
     let msg = document.getElementById("tehmsg");
-    let fil = document.getElementById("tehfile");
     let but = document.getElementById("tehbutton");
     let ctx = document.getElementById("tehcanvas").getContext("2d");
 
@@ -48,10 +46,18 @@
                     arg.files.item(0).fileName + " and is " +
                     arg.files.item(0).fileSize + " bytes big!";
                 break;
+            case "session-ended":
+                // Ignore
+                break;
             case "error":
                 msg.innerHTML = "There was an error :( " + type + " :: " + arg;
                 break;
         }
+    }
+    
+    if (!Me) {
+        msg.innerHTML = "The Rainbow add-on could not be loaded!";
+        but.disabled = true;
     }
     
     but.onclick = function() {

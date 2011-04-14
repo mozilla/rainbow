@@ -47,13 +47,10 @@ public:
 
     nsresult Stop();
     nsresult Start(nsIDOMCanvasRenderingContext2D *ctx);
-    nsresult StartRecording(nsIOutputStream *pipe);
-    nsresult StopRecording();
 
 protected:
-    PRBool recording;
+    PRBool running;
     PRThread *sampler;
-    nsIOutputStream *output;
     nsIDOMCanvasRenderingContext2D *vCanvas;
     static void Grabber(void * data);
         
