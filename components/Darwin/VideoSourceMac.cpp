@@ -145,25 +145,6 @@ VideoSourceMac::Start(nsIDOMCanvasRenderingContext2D *ctx)
 }
 
 nsresult
-VideoSourceMac::StartRecording(nsIOutputStream *pipe)
-{
-    if (!g2g)
-        return NS_ERROR_FAILURE;
-    output = pipe;
-    is_rec = PR_TRUE;
-    return NS_OK;
-}
-
-nsresult
-VideoSourceMac::StopRecording()
-{
-    if (!g2g)
-        return NS_ERROR_FAILURE;
-    is_rec = PR_FALSE;
-    return NS_OK;
-}
-
-nsresult
 VideoSourceMac::Stop()
 {
     if (!g2g)

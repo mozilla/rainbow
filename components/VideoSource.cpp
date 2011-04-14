@@ -40,9 +40,6 @@ VideoSource::VideoSource(int w, int h)
 {
     width = w;
     height = h;
-
-    /* Setup logger */
-    log = PR_NewLogModule("VideoSource");
 }
 
 int
@@ -64,3 +61,21 @@ VideoSource::GetFPSD()
     return fps_d;
 }
 
+nsresult
+VideoSource::StartRecording(nsIOutputStream *pipe)
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+    output = pipe;
+    is_rec = PR_TRUE;
+    return NS_OK;
+}
+
+nsresult
+VideoSource::StopRecording()
+{
+    if (!g2g)
+        return NS_ERROR_FAILURE;
+    is_rec = PR_FALSE;
+    return NS_OK;
+}

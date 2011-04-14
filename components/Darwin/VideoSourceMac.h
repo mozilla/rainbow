@@ -52,15 +52,13 @@ public:
 
     nsresult Stop();
     nsresult Start(nsIDOMCanvasRenderingContext2D *ctx);
-    nsresult StartRecording(nsIOutputStream *pipe);
-    nsresult StopRecording();
+    
     
 protected:
-    PRBool is_rec;
     vidcap_sapi *sapi;
     vidcap_src *source;
     vidcap_state *state;
-    nsIOutputStream *output;
+    
     struct vidcap_src_info *sources;
     struct vidcap_fmt_info fmt_info;
     nsIDOMCanvasRenderingContext2D *vCanvas;

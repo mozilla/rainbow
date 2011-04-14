@@ -80,10 +80,10 @@ var RainbowObserver = {
             let i = Components.classes["@labs.mozilla.com/media/recorder;1"].
                 getService(Components.interfaces.IMediaRecorder);
         } catch(e) {
-            Components.classes["@mozilla.org/consoleservice;1"].
-                getService(Components.interfaces.nsIConsoleService).
-                reportError("Rainbow could not load component, are you in " +
-                "32-bit mode?");
+            Components.utils.reportError(
+                "Rainbow could not load component, are you in " +
+                "32-bit mode?"
+            );
             return;
         }
         
