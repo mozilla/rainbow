@@ -36,6 +36,9 @@
 
 #include "VideoSourceCanvas.h"
 
+/* 1000000 us = 1 sec. */
+#define MICROSECONDS 1000000
+
 VideoSourceCanvas::VideoSourceCanvas(int w, int h)
     : VideoSource(w, h)
 {
@@ -88,7 +91,8 @@ VideoSourceCanvas::Grabber(void *data)
     char *i420 = (char *)PR_Calloc(isize, 1);
     PRUint8 *rgb32 = (PRUint8 *)PR_Calloc(fsize, 1);
 
-    PRFloat64 epoch = 0.0;
+    PRTime epoch_c;
+    PRFloat64 epoch;
     PRIntervalTime ticks = PR_TicksPerSecond() / 30;
     while (vs->running) {
         PR_Sleep(ticks);
@@ -101,6 +105,9 @@ VideoSourceCanvas::Grabber(void *data)
 
         RGB32toI420(vs->width, vs->height, (const char *)rgb32, i420);
         
+        epoch_c = PR_Now();
+        epoch = (PRFloat64)(epoch_c / MICROSECONDS);
+        epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
         rv = vs->output->Write((const char *)&epoch, sizeof(PRFloat64), &wr);
         rv = vs->output->Write((const char *)&isize, sizeof(PRUint32), &wr);
         rv = vs->output->Write((const char *)i420, isize, &wr);
