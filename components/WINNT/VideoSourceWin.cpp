@@ -223,7 +223,9 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     VIDEOINFOHEADER *pVid;
 
     g2g = PR_FALSE;
-
+    width = w;
+    height = h;
+    
     hr = CoInitialize(0);
     if (FAILED(hr)) return;
 
@@ -314,6 +316,7 @@ VideoSourceWin::VideoSourceWin(int w, int h)
     /* Instance initialized properly */
     SAFE_RELEASE(pConfig);
     g2g = PR_TRUE;
+    m_refCount = 0;
 }
 
 VideoSourceWin::~VideoSourceWin()
@@ -329,8 +332,7 @@ VideoSourceWin::~VideoSourceWin()
 }
 
 nsresult
-VideoSourceWin::Start(
-    nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx)
+VideoSourceWin::Start(nsIDOMCanvasRenderingContext2D *ctx)
 {
     HRESULT hr;
 
@@ -338,9 +340,9 @@ VideoSourceWin::Start(
         return NS_ERROR_FAILURE;
 
     /* Set our callback */
+    vCanvas = ctx;
     pGrabber->SetBufferSamples(TRUE);
-    cb = new VideoSourceWinCallback(pipe, width, height, ctx);
-    hr = pGrabber->SetCallback(cb, TYPE_SAMPLECB);
+    hr = pGrabber->SetCallback(this, TYPE_SAMPLECB);
 
     /* Add Sample Grabber to graph */
     hr = pGraph->AddFilter(pGrabberF, L"Sample Grabber");
@@ -381,35 +383,17 @@ VideoSourceWin::Stop()
         return NS_ERROR_FAILURE;
 
     pMC->StopWhenReady();
-    delete cb;
     return NS_OK;
 }
 
-/* Callback class */
-VideoSourceWinCallback::VideoSourceWinCallback(
-    nsIOutputStream *pipe, int width, int height,
-    nsIDOMCanvasRenderingContext2D *ctx)
-{
-    w = width;
-    h = height;
-    output = pipe;
-    vCanvas = ctx;
-    m_refCount = 0;
-    
-    /* Establish baseline stream time with absolute time since epoch */
-    PRTime epoch_c = PR_Now();
-    epoch = (PRFloat64)(epoch_c / MICROSECONDS);
-    epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
-}
-
 STDMETHODIMP_(ULONG)
-VideoSourceWinCallback::AddRef()
+VideoSourceWin::AddRef()
 {
     return ++m_refCount;
 }
 
 STDMETHODIMP_(ULONG)
-VideoSourceWinCallback::Release()
+VideoSourceWin::Release()
 {
     if (!m_refCount) {
         return 0;
@@ -418,7 +402,7 @@ VideoSourceWinCallback::Release()
 }
 
 STDMETHODIMP
-VideoSourceWinCallback::QueryInterface(REFIID riid, void **ppvObject)
+VideoSourceWin::QueryInterface(REFIID riid, void **ppvObject)
 {
     if (!ppvObject) {
         return E_POINTER;
@@ -438,7 +422,7 @@ VideoSourceWinCallback::QueryInterface(REFIID riid, void **ppvObject)
 }
 
 STDMETHODIMP
-VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
+VideoSourceWin::SampleCB(double Time, IMediaSample *pSample)
 {
     HRESULT hr;
     nsresult rv;
@@ -450,8 +434,8 @@ VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
     int start, end, fsize, isize, bpp;
     
     bpp = 4;
-    fsize = w * h * 4;
-    isize = w * h * 3 / 2;
+    fsize = width * height * 4;
+    isize = width * height * 3 / 2;
     bufferLen = pSample->GetActualDataLength();
     
     hr = pSample->GetPointer(&pBuffer);
@@ -483,15 +467,10 @@ VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
         pBuffer[end+3] = tmp;
     }
     
-    /* Write sample to canvas if neccessary */
-    if (vCanvas) {
-        nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
-            vCanvas, w, h, rgb32, fsize
-        );
-        rv = NS_DispatchToMainThread(render);
-    }
-    
     /* Write header: timestamp + length */
+    if (is_rec != PR_TRUE)
+        return S_OK;
+    
     PRFloat64 current = epoch + Time;
     rv = output->Write(
         (const char *)&current, sizeof(PRFloat64), &wr
@@ -499,18 +478,26 @@ VideoSourceWinCallback::SampleCB(double Time, IMediaSample *pSample)
     rv = output->Write(
         (const char *)&isize, sizeof(PRUint32), &wr
     );
-    
     /* Write to pipe after converting to i420 */
     i420buf = (PRUint8 *)PR_Calloc(isize, sizeof(PRUint8));
-    RGB32toI420(w, h, (const char *)pBuffer, (char *)i420buf);
+    RGB32toI420(width, height, (const char *)pBuffer, (char *)i420buf);
     rv = output->Write((const char *)i420buf, isize, &wr);
     PR_Free(i420buf);
+    
+    /* Write sample to canvas if neccessary */
+    if (vCanvas) {
+        nsCOMPtr<nsIRunnable> render = new CanvasRenderer(
+            vCanvas, width, height, rgb32, fsize
+        );
+        rv = NS_DispatchToMainThread(render);
+    }
+    rgb32 = NULL; // AutoPtr should free this?
     
     return S_OK;
 }
 
 STDMETHODIMP
-VideoSourceWinCallback::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
+VideoSourceWin::BufferCB(double Time, BYTE *pBuffer, long bufferLen)
 {
     return E_NOTIMPL;
 }

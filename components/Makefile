@@ -132,6 +132,10 @@ ifeq ($(os), WINNT)
   libs := $(patsubst %,$(sdkdir)/lib/%.lib,$(libs))
   headers += -I../lib/WINNT_x86-msvc/include
 
+  # Window and DirectX SDK paths
+  #libdirs += -LIBPATH:"C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\Lib"
+  #libdirs += -LIBPATH:"C:\Program Files (x86)\Microsoft DirectX SDK (June 2008)\Lib\x86"
+  
   ifeq ($(debug),1)
     cppflags += -MTd -DDEBUG
     ldops = -DEBUG msvcrtd.lib \

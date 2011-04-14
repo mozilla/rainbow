@@ -78,41 +78,21 @@ extern CLSID CLSID_NullRenderer;
 #define SAFE_RELEASE(x) { if (x) x->Release(); x = NULL; }
 /* End qedit.h */
 
-class VideoSourceWinCallback : public ISampleGrabberCB
-{
-public:
-    VideoSourceWinCallback(
-        nsIOutputStream *pipe, int w, int h, nsIDOMCanvasRenderingContext2D *ctx
-    );
-
-    STDMETHODIMP_(ULONG) AddRef();
-    STDMETHODIMP_(ULONG) Release();
-    STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject);
-    STDMETHODIMP SampleCB(double Time, IMediaSample *pSample);
-    STDMETHODIMP BufferCB(double Time, BYTE *pBuffer, long BufferLen);
-
-private:
-    int w;
-    int h;
-    int m_refCount;
-    
-    PRFloat64 epoch;
-    nsIOutputStream *output;
-    nsIDOMCanvasRenderingContext2D *vCanvas;
-    
-    IID m_IID_ISampleGrabberCB;
-
-};
-
-class VideoSourceWin : public VideoSource
+class VideoSourceWin : public VideoSource, public ISampleGrabberCB
 {
 public:
     VideoSourceWin(int w, int h);
     ~VideoSourceWin();
 
     nsresult Stop();
-    nsresult Start(nsIOutputStream *pipe, nsIDOMCanvasRenderingContext2D *ctx);
-
+    nsresult Start(nsIDOMCanvasRenderingContext2D *ctx);
+    
+    STDMETHODIMP_(ULONG) AddRef();
+    STDMETHODIMP_(ULONG) Release();
+    STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject);
+    STDMETHODIMP SampleCB(double Time, IMediaSample *pSample);
+    STDMETHODIMP BufferCB(double Time, BYTE *pBuffer, long BufferLen);
+    
 protected:
     IMediaControl *pMC;
     IGraphBuilder *pGraph;
@@ -125,6 +105,9 @@ protected:
 
     AM_MEDIA_TYPE *pMT;
     IAMStreamConfig *pConfig;
-    VideoSourceWinCallback *cb;
 
+    int m_refCount;
+    PRFloat64 epoch;
+    IID m_IID_ISampleGrabberCB;
+    nsIDOMCanvasRenderingContext2D *vCanvas;
 };
