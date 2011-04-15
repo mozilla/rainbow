@@ -23,8 +23,8 @@ Quick testing
 We have setup test pages for Rainbow on http://mozilla.github.com/rainbow/
 which you can visit after you install the add-on. The domain has already been
 added to the default preference 'extensions.rainbow.allowedDomains', but
-if you are upgrading from an older version, please add 'http://mozilla.github.com'
-manually to the preference via about:config.
+if you are upgrading from an older version, you should receive a permissions
+dialog.
 
 ---
 API
@@ -32,7 +32,7 @@ API
 The JS API offers the capability to record multiplexed audio and video files
 to disk:
 
-window.navigator.media.recordToFile(params, ctx);
+window.navigator.media.beginSession(params, ctx, observer);
 
 where 'params' is a JS Object, which may contain the following properties.
 The types and default values for each property are in brackets:
@@ -49,22 +49,37 @@ The types and default values for each property are in brackets:
 
 and 'ctx' is the 2D context of a canvas on which a live preview (if video was
 requested) will be drawn. 'ctx' may be null in case you do not want a preview.
-The record call will return an object, on which you can call stop() to end
-recording. It will return a DOM File object which you may then upload.
+
+'observer' is a JS function that will be called whenever a significant event
+occurs. It will take two arguments, and you will usually want to switch on the
+first one, which is the event type:
+
+function onStateChange(type, data)
+{
+    switch (type) {
+        case "session-began": window.navigator.media.beginRecord(); break;
+        case "record-began": break;
+        case "record-ended": break;
+        case "record-finished": alert("got file " + data); break;
+        case "session-ended": break;
+    }
+}
+
+While beginSession only sets up Rainbow in 'preview' mode, which means
+the canvas will be painted as usual, you must explicitly call beginRecord()
+to start the encoding process. Calling endRecord() will result in the
+'record-ended' and 'record-finished' events being passed to your observer,
+and the latter's 'data' argument will be set to a DOMFile.
+
 Please see content/example.html for sample usage of the API.
 
-Rainbow 0.3 also offer support for recording from a canvas as source (instead
+Rainbow also offers support for recording from a canvas as source (instead
 of a webcam). The canvas will be sampled the rate of 30 frames per second. You
 can do this by specifying the 'source' property of the params object to be
-'true'. This will treat the 'ctx' argument you pass to the recordToFile function
-as the source of video rather than the destinatin of a live preview. Please
-see content/example_canvas.html for an example of such usage.
+'true'. This will treat the 'ctx' argument you pass to the beginSession
+function as the source of video rather than the destination of a live preview.
 
-For the really bold, Rainbow 0.3 also comes with experimental support for 
-streaming to an Icecast server. See content/example_stream.html to see how this
-is done. You will have to configure your Icecast server to accept the username /
-password combination 'source:rainbow'. We have dropped support for writing
-streams to a websocket (since they will not be enabled by default in Firefox 4).
+Please see content/example_canvas.html for an example of such usage.
 
 ---------------
 Temporary Files
@@ -82,16 +97,6 @@ the web application that requested their creation is done with them.
 -------------
 Common Errors
 -------------
-"Error: Permission denied for <http://localhost> to call method
-    UnnamedClass.toString on <>.
- Error: uncaught exception: unknown (can't convert to string)"
-
-This usually means that a device to record audio or video was not found. If you
-look at the command line (stderr) you will find a clearer error message. We need
-to propagate this type of error correctly to JS. Verify that your camera and
-microphone are working with a third party application and re-run the examples
-with either audio or video disabled.
-
 "Error: window.navigator.service is undefined"
 
 This can mean one of two things:
@@ -120,13 +125,6 @@ On Mac (Snow Leopard), 64-bit versions of Minefield are not supported. You
 may run your Minefield nightly in 32-bit mode like so:
 $ arch -i386 /Applications/Minefield.app/Contents/MacOS/firefox-bin
 
---------------
-Video Playback 
---------------
-Rainbow 0.1 produced incorrectly encoded OGG files, the audio component of
-which could not be played by Firefox. Simply upgrade to Rainbow 0.2 to fix
-the issue.
-
 --------
 Building
 --------
@@ -143,4 +141,3 @@ directory in lib/ and the build system will automatically link with them.
 
 You may set debug=1 to create a version of the XPCOM component with debugging
 symbols.
-
