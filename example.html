@@ -10,14 +10,11 @@
     <canvas id="tehcanvas" width="640" height="480"></canvas>
     <p><input type="button" id="tehbutton" value="Start!"/></p>
     <p id="tehmsg"></p>
-    <input type="file" id="tehfile" style="display:none;"></input>
 </body>
 <script type="application/javascript;version=1.8">
-    let Sr, Fi;
     let Re = false;
     let img = new Image();
     let msg = document.getElementById("tehmsg");
-    let fil = document.getElementById("tehfile");
     let but = document.getElementById("tehbutton");
     let ctx = document.getElementById("tehcanvas").getContext("2d");
 
@@ -26,24 +23,53 @@
         ctx.drawImage(img, 192, 112);
     }
 
+    function onStateChange(type, arg) {
+        switch (type) {
+            case "session-began":
+                Me.beginRecording();
+                break;
+            case "record-began":
+                msg.innerHTML = "Recording has begun!";
+                break;
+            case "record-ended":
+                // Recording stopped, but file may not ready yet
+                Me.endSession();
+                Re = false;
+                but.value = "Start!";
+                ctx.drawImage(img, 192, 112);
+                break;
+            case "record-finished":
+                // File is now available
+                // arg is a DOM File, see
+                // https://developer.mozilla.org/en/Using_files_from_web_applications
+                msg.innerHTML = "Your video was named: " +
+                    arg.files.item(0).fileName + " and is " +
+                    arg.files.item(0).fileSize + " bytes big!";
+                break;
+            case "session-ended":
+                // Ignore
+                break;
+            case "error":
+                msg.innerHTML = "There was an error :( " + type + " :: " + arg;
+                break;
+        }
+    }
+    
+    if (!Me) {
+        msg.innerHTML = "The Rainbow add-on could not be loaded!";
+        but.disabled = true;
+    }
+    
     but.onclick = function() {
         if (Re) {
             // Stop recording
-            Fi = Sr.stop();
-            Re = false;
-            but.value = "Start!";
-            ctx.drawImage(img, 192, 112);
-
-            // See https://developer.mozilla.org/en/Using_files_from_web_applications
-            msg.innerHTML = "Your video was named: " +
-                Fi.files.item(0).fileName + " and is " +
-                Fi.files.item(0).fileSize + " bytes big!";
+            Me.endRecording();
         } else {
             // Start recording
             Re = true;
             but.value = "Stop!";
-            msg.innerHTML = " ";
-            Sr = Me.recordToFile({}, ctx);
+            msg.innerHTML = "Loading...";
+            Me.beginSession({}, ctx, onStateChange);
         }
     }
 </script>
