@@ -345,6 +345,7 @@ video:
             }
             if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
                 fprintf(stderr, "GetVideoPacket returned NULL\n");
+                goto finish;
             }
             delta = vtime - current_audio_time;
         }

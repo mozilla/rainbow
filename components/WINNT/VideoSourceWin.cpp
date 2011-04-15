@@ -471,9 +471,14 @@ VideoSourceWin::SampleCB(double Time, IMediaSample *pSample)
     if (is_rec != PR_TRUE)
         return S_OK;
     
-    PRFloat64 current = epoch + Time;
+    //PRFloat64 current = epoch + Time;
+    PRTime epoch_c = PR_Now();
+    PRFloat64 epoch = (PRFloat64)(epoch_c / MICROSECONDS);
+    epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
+    epoch -= Time;
+    
     rv = output->Write(
-        (const char *)&current, sizeof(PRFloat64), &wr
+        (const char *)&epoch, sizeof(PRFloat64), &wr
     );
     rv = output->Write(
         (const char *)&isize, sizeof(PRUint32), &wr
