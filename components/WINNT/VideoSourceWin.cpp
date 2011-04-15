@@ -475,7 +475,6 @@ VideoSourceWin::SampleCB(double Time, IMediaSample *pSample)
     PRTime epoch_c = PR_Now();
     PRFloat64 epoch = (PRFloat64)(epoch_c / MICROSECONDS);
     epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
-    epoch -= Time;
     
     rv = output->Write(
         (const char *)&epoch, sizeof(PRFloat64), &wr
