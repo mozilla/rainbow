@@ -1,0 +1,51 @@
+<html>
+<head>
+    <title>Rainbow!</title>
+    <script type="application/javascript;version=1.8">
+        let Me = window.navigator.service.media;
+    </script>
+</head>
+<body style="margin:50px 0px;padding:0px;text-align:center;">
+    <h1>Recording Example</h1>
+    <canvas id="tehcanvas" width="640" height="480"></canvas>
+    <p><input type="button" id="tehbutton" value="Start!"/></p>
+    <p id="tehmsg"></p>
+    <input type="file" id="tehfile" style="display:none;"></input>
+</body>
+<script type="application/javascript;version=1.8">
+    let Sr, Fi;
+    let Re = false;
+    let img = new Image();
+    let msg = document.getElementById("tehmsg");
+    let fil = document.getElementById("tehfile");
+    let but = document.getElementById("tehbutton");
+    let ctx = document.getElementById("tehcanvas").getContext("2d");
+
+    img.src = "rainbow.png";
+    img.onload = function() {
+        ctx.drawImage(img, 192, 112);
+    }
+
+    but.onclick = function() {
+        if (Re) {
+            // Stop recording
+            Fi = Sr.stop();
+            Re = false;
+            but.value = "Start!";
+            ctx.drawImage(img, 192, 112);
+
+            // See https://developer.mozilla.org/en/Using_files_from_web_applications
+            msg.innerHTML = "Your video was named: " +
+                Fi.files.item(0).fileName + " and is " +
+                Fi.files.item(0).fileSize + " bytes big!";
+        } else {
+            // Start recording
+            Re = true;
+            but.value = "Stop!";
+            msg.innerHTML = " ";
+            Sr = Me.recordToFile({}, ctx);
+        }
+    }
+</script>
+</html>
+
