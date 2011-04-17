@@ -205,7 +205,6 @@ build: $(so_target) $(idl_typelib)
 
 clean:
 	rm -f $(so_target) $(cpp_objects) \
-  $(idl_typelib) $(idl_headers) \
 	$(target:=.res) fake.lib fake.exp $(target).pdb $(target).ilk
 
 # rules to build the c headers and .xpt from idl
