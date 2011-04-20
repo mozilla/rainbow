@@ -8,6 +8,13 @@ ifeq ($(sys), Darwin)
   so = dylib
   teh = Mac
 else
+ifeq ($(sys), MINGW32_NT-5.1)
+  os = WINNT
+  compiler = msvc
+  cxx = cl
+  so = dll
+  teh = Win
+else
 ifeq ($(sys), MINGW32_NT-6.1)
   os = WINNT
   compiler = msvc
@@ -23,6 +30,7 @@ ifeq ($(sys), Linux)
   teh = Nix
 else
   $(error Sorry, your os is unknown/unsupported: $(sys))
+endif
 endif
 endif
 endif
@@ -132,36 +140,24 @@ ifeq ($(os), WINNT)
   libs := $(patsubst %,$(sdkdir)/lib/%.lib,$(libs))
   headers += -I../lib/WINNT_x86-msvc/include
 
-  # Window and DirectX SDK paths
-  #libdirs += -LIBPATH:"C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\Lib"
-  #libdirs += -LIBPATH:"C:\Program Files (x86)\Microsoft DirectX SDK (June 2008)\Lib\x86"
-  
   ifeq ($(debug),1)
     cppflags += -MTd -DDEBUG
-    ldops = -DEBUG msvcrtd.lib \
-        /NODEFAULTLIB:libcmt /NODEFAULTLIB:msvcrt /NODEFAULTLIB:libcmtd
   else
     cppflags += -MT
-    ldops = msvcrt.lib /NODEFAULTLIB:libcmt
+	ldflags = -NODEFAULTLIB:msvcrt
   endif
 
-  cppflags += -c -nologo -O1 -GR- -TP -Zc:wchar_t- -W3 -Gy $(headers) \
-    -DTRIMMED -D_CRT_SECURE_NO_DEPRECATE=1 \
-    -D_CRT_NONSTDC_NO_DEPRECATE=1 -DWINVER=0x500 -D_WIN32_WINNT=0x500 \
-    -D_WIN32_IE=0x0500 -DX_DISPLAY_MISSING=1 -DMOZILLA_VERSION=\"1.9pre\" \
-    -DMOZILLA_VERSION_U=1.9pre -DHAVE_SNPRINTF=1 -D_WINDOWS=1 -D_WIN32=1 \
-    -DWIN32=1 -DXP_WIN=1 -DXP_WIN32=1 -DHW_THREADS=1 -DSTDC_HEADERS=1 \
-    -DWIN32_LEAN_AND_MEAN=1 -DNO_X11=1 -DHAVE_MMINTRIN_H=1 \
-    -DHAVE_OLEACC_IDL=1 -DHAVE_ATLBASE_H=1 -DHAVE_WPCAPI_H=1 -D_X86_=1 \
-    -DD_INO=d_ino -DMOZ_NO_MOZALLOC=1
-  ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS -NXCOMPAT -SAFESEH \
-    -IMPLIB:fake.lib \
-    $(libdirs) $(libs) \
+  cppflags += -c -nologo -Zc:wchar_t- $(headers) \
+	-DXP_WIN=1 -DHW_THREADS=1 \
+	-DWIN32_LEAN_AND_MEAN=1 -DMOZ_NO_MOZALLOC=1
+  ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS \
+    -LTCG -MANIFEST $(libdirs) $(libs) \
     ../lib/WINNT_x86-msvc/libogg.lib \
     ../lib/WINNT_x86-msvc/libvorbis.lib \
     ../lib/WINNT_x86-msvc/libtheora.lib \
-    strmiids.lib comsuppw.lib ole32.lib \
-    oleaut32.lib user32.lib advapi32.lib winmm.lib $(ldops)
+	winmm.lib user32.lib advapi32.lib \
+    strmiids.lib ole32.lib oleaut32.lib \
+	user32.lib advapi32.lib winmm.lib $(ldops)
 rcflags := -r $(headers)
 else
 ifeq ($(os), Linux)
@@ -204,8 +200,9 @@ all: build
 build: $(so_target) $(idl_typelib)
 
 clean:
-	rm -f $(so_target) $(cpp_objects) \
-	$(target:=.res) fake.lib fake.exp $(target).pdb $(target).ilk
+	rm -f $(so_target) $(so_target).manifest $(cpp_objects) \
+	$(target:=.res) libmediarecorder.lib libmediarecorder.exp \
+	$(target).pdb $(target).ilk
 
 # rules to build the c headers and .xpt from idl
 $(idl_headers): $(idl)
@@ -229,6 +226,7 @@ ifeq ($(os), WINNT)
 
   $(so_target): $(idl_headers) $(cpp_objects)
 	link -OUT:$@ -PDB:$(@:.dll=.pdb) $(cpp_objects) $(ldflags)
+	mt.exe -manifest $(so_target).manifest -outputresource:"$@;2"
 	chmod +x $@
 else
 ifeq ($(os), Linux)
@@ -238,4 +236,3 @@ ifeq ($(os), Linux)
 endif
 endif
 endif
-

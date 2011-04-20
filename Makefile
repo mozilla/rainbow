@@ -9,7 +9,7 @@ sys := $(shell uname -s)
 ifeq ($(sys), Darwin)
   so = dylib
 else
-ifeq ($(sys), MINGW32_NT-6.1)
+ifeq ($(sys), MINGW32_NT-5.1)
   so = dll
 else
 ifeq ($(sys), Linux)
