@@ -169,7 +169,7 @@ Rainbow.prototype = {
         }
     },
     
-    beginSession: function(prop, ctx, obs) {
+    beginSession: function(prop, ctx, audio, obs) {
         if (this._session)
             throw "Session already in progress";
 
@@ -182,12 +182,18 @@ Rainbow.prototype = {
         
         // Create dummy HTML <input> element to create DOMFile(s)
         this._context = ctx;
-        let doc = this._context.canvas.ownerDocument;
+
+        let doc;
+        if (this._context)
+            doc = this._context.canvas.ownerDocument;
+        else if (audio)
+            doc = audio.ownerDocument;
+        
         this._input = doc.createElement('input');
         this._input.type = 'file';
         
         // Start rainbow session
-        this._rainbow.beginSession(bag, ctx, this._observer);
+        this._rainbow.beginSession(bag, ctx, audio, this._observer);
         this._session = true;
     },
     

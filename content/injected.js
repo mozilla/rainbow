@@ -3,8 +3,8 @@ if (window && window.navigator) {
     if (!window.navigator.service)
         window.navigator.service = {};
     window.navigator.service.media = {
-        beginSession: function(params, ctx, obs) {
-            return sessStart(window.location, params, ctx, obs);
+        beginSession: function(params, ctx, audio, obs) {
+            return sessStart(window.location, params, ctx, audio, obs);
         },
         beginRecording: function() {
             return recStart(window.location);

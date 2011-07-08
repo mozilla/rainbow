@@ -35,7 +35,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "MediaRecorder.h"
-#include "assert.h"
 
 #define MICROSECONDS 1000000
 #define TOLERANCE 0.050000
@@ -142,6 +141,33 @@ MediaRecorder::GetAudioPacket(PRInt32 len)
         return NULL;
     }
     
+    /* Write to <audio> element if available. It expects interleaved data */
+    if (audio && jsctx) {
+        int i, n;
+        float *data;
+        jsval arrayval;
+        PRUint32 retval;
+        JSObject *array;
+        js::TypedArray *typedarray;
+
+        n = len / aState->backend->GetFrameSize();
+        /* FIXME: Who is going to free this? */
+        array = js_CreateTypedArray(jsctx, js::TypedArray::TYPE_FLOAT32, (jsuint)n);
+        if (!array) {
+            fprintf(stderr, "could not create JS typedarray for <audio>!\n");
+            return a_frames;
+        }
+
+        arrayval = OBJECT_TO_JSVAL(array);
+        typedarray = js::TypedArray::fromJSObject(array);
+        data = (float *) typedarray->data;
+
+        for (i = 0; i < n; i++) {
+            data[i] = (float)((float)a_frames[i] / 32768.f);
+        }
+        audio->MozWriteAudio(arrayval, jsctx, &retval);
+    }
+
     return a_frames;
 }
 
@@ -171,7 +197,7 @@ MediaRecorder::EncodeAudio(PRInt16 *a_frames, int len)
 }
 
 /*
- * Get an audio packet from the pipe.
+ * Get a video packet from the pipe.
  */
 PRUint8 *
 MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
@@ -415,6 +441,9 @@ MediaRecorder::Init()
     m_session = PR_FALSE;
     log = PR_NewLogModule("MediaRecorder");
 
+    jsctx = nsnull;
+    audio = nsnull;
+    canvas = nsnull;
     pipeStream = nsnull;
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
@@ -659,10 +688,14 @@ NS_IMETHODIMP
 MediaRecorder::BeginSession(
     nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
-    nsIMediaStateObserver *obs
+    nsIDOMHTMLAudioElement *actx,
+    nsIMediaStateObserver *obs,
+    JSContext *jctx
 )
 {
     canvas = ctx;
+    audio = actx;
+    jsctx = jctx;
     observer = obs;
     ParseProperties(prop);
     
@@ -743,7 +776,11 @@ MediaRecorder::BeginSessionThread(void *data)
             return;
         }
     }
-    /* No preview for audio */
+
+    /* Setup <audio> for writing, if provided */
+    if (params->audio && mr->audio) {
+        mr->audio->MozSetup(params->chan, params->rate);
+    }
 
     mr->m_session = PR_TRUE;
     NS_DispatchToMainThread(new MediaCallback(

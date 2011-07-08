@@ -47,10 +47,13 @@
 #include <plbase64.h>
 #include <prthread.h>
 
+#include <jstypedarray.h>
+
 #include <nsIPipe.h>
 #include <nsIFileStreams.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
+#include <nsIDOMHTMLAudioElement.h>
 #include <nsIDOMCanvasRenderingContext2D.h>
 
 #include <nsCOMPtr.h>
@@ -128,11 +131,14 @@ protected:
     Audio *aState;
     Video *vState;
 
+    JSContext *jsctx;
     PRThread *thread;
     PRBool m_session;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
+
+    nsIDOMHTMLAudioElement *audio;
     nsIDOMCanvasRenderingContext2D *canvas;
     
     nsCOMPtr<nsIOutputStream> pipeStream;

@@ -113,6 +113,7 @@ ifeq ($(os), Darwin)
     -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -fshort-wchar -fpascal-strings -pthread \
     -Wall -Werror -Wconversion -Wpointer-arith \
+    -Wno-invalid-offsetof \
     -Woverloaded-virtual -Wsynth -Wno-ctor-dtor-privacy \
     -Wno-non-virtual-dtor -Wcast-align -Wno-long-long \
     -include xpcom-config.h $(headers)
@@ -120,6 +121,7 @@ ifeq ($(os), Darwin)
     -mmacosx-version-min=10.5 -arch i386 \
     -Wl,-executable_path,$(sdkdir)/bin \
     -Wl,-dead_strip \
+    $(sdkdir)/lib/XUL \
     ../lib/Darwin_i386-gcc3/libogg.a \
     ../lib/Darwin_i386-gcc3/libvorbis.a \
     ../lib/Darwin_i386-gcc3/libvidcap.a \

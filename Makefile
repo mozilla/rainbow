@@ -2,7 +2,7 @@ ifeq ($(TOPSRCDIR),)
   export TOPSRCDIR = $(shell pwd)
 endif
 ifeq ($(VERSION),)
-  export VERSION = 0.4
+  export VERSION = 0.5
 endif
 
 sys := $(shell uname -s)
