@@ -1,0 +1,76 @@
+<html>
+<head>
+    <title>Rainbow!</title>
+    <script type="application/javascript;version=1.8">
+        let Me = window.navigator.service.media;
+    </script>
+</head>
+<body style="margin:50px 0px;padding:0px;text-align:center;">
+    <h1>Audio Input Example</h1>
+    <!--<canvas id="tehcanvas" width="640" height="480"></canvas>-->
+    <textarea id="tehtext"></textarea>
+    <audio id="tehaudio"></audio>
+    <p><input type="button" id="tehbutton" value="Start!"/></p>
+    <p id="tehmsg"></p>
+</body>
+<script type="application/javascript;version=1.8">
+    let Re = false;
+    let msg = document.getElementById("tehmsg");
+    let but = document.getElementById("tehbutton");
+    let txt = document.getElementById("tehtext");
+    let aud = document.getElementById("tehaudio");
+
+    aud.addEventListener('MozAudioAvailable', function(event) {
+        txt.value = txt.value + "\n" + event.frameBuffer;
+    }, false);
+
+    function onStateChange(type, arg) {
+        switch (type) {
+            case "session-began":
+                Me.beginRecording();
+                break;
+            case "record-began":
+                msg.innerHTML = "Recording has begun!";
+                break;
+            case "record-ended":
+                // Recording stopped, but file may not ready yet
+                Me.endSession();
+                Re = false;
+                but.value = "Start!";
+                break;
+            case "record-finished":
+                // File is now available
+                // arg is a DOM File, see
+                // https://developer.mozilla.org/en/Using_files_from_web_applications
+                msg.innerHTML = "Your video was named: " +
+                    arg.files.item(0).fileName + " and is " +
+                    arg.files.item(0).fileSize + " bytes big!";
+                break;
+            case "session-ended":
+                // Ignore
+                break;
+            case "error":
+                msg.innerHTML = "There was an error :( " + type + " :: " + arg;
+                break;
+        }
+    }
+    
+    if (!Me) {
+        msg.innerHTML = "The Rainbow add-on could not be loaded!";
+        but.disabled = true;
+    }
+    
+    but.onclick = function() {
+        if (Re) {
+            // Stop recording
+            Me.endRecording();
+        } else {
+            // Start recording
+            Re = true;
+            but.value = "Stop!";
+            msg.innerHTML = "Loading...";
+            Me.beginSession({video: false}, null, aud, onStateChange);
+        }
+    }
+</script>
+</html>
