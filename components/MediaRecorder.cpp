@@ -36,6 +36,7 @@
 
 #include "MediaRecorder.h"
 #include "assert.h"
+#include "jstypedarray.h"
 
 #define MICROSECONDS 1000000
 #define TOLERANCE 0.050000
@@ -141,7 +142,38 @@ MediaRecorder::GetAudioPacket(PRInt32 len)
         PR_Free(a_frames);
         return NULL;
     }
-    
+
+    if (mAudioElement) {
+        int a_frame_num = FRAMES_BUFFER;
+        int a_frame_size = aState->backend->GetFrameSize();
+        //NS_ASSERTION(a_frame_num * a_frame_size == len)
+        int num_elements = a_frame_size / sizeof(PRUint16);
+
+        int frame;
+        for (frame = 0; frame < a_frame_num; frame++) {
+            JSObject *array = js_CreateTypedArray(mJSCtx,
+                                                  js::TypedArray::TYPE_FLOAT32,
+                                                  (jsuint) num_elements);
+            if (!array) {
+                continue;
+            }
+            jsval arrayval = OBJECT_TO_JSVAL(array);
+            js::TypedArray *typedarray = js::TypedArray::fromJSObject(array);
+            float *arraydata = (float *) typedarray->data;
+
+            // Convert from PRUint16 array to floats (which is what the
+            // audio element expects)
+            int i;
+            for (i = 0; i < num_elements; i++) {
+                PRUint16 frame_el = a_frames[frame * num_elements + i];
+                arraydata[i] = frame_el / 32768;
+            }
+
+            PRUint32 retval;
+            mAudioElement->MozWriteAudio(arrayval, mJSCtx, &retval);
+        }
+    }
+
     return a_frames;
 }
 
@@ -658,11 +690,15 @@ MediaRecorder::ParseProperties(nsIPropertyBag2 *prop)
 NS_IMETHODIMP
 MediaRecorder::BeginSession(
     nsIPropertyBag2 *prop,
-    nsIDOMCanvasRenderingContext2D *ctx,
-    nsIMediaStateObserver *obs
+    nsIDOMCanvasRenderingContext2D *canvasCtx,
+    nsIDOMHTMLAudioElement *audioElement,
+    nsIMediaStateObserver *obs,
+    JSContext* jsctx
 )
 {
-    canvas = ctx;
+    canvas = canvasCtx;
+    mAudioElement = audioElement;
+    mJSCtx = jsctx;
     observer = obs;
     ParseProperties(prop);
     
@@ -795,13 +831,24 @@ MediaRecorder::BeginRecording(nsILocalFile *file)
 {
     /* Get a file stream from the local file */
     nsresult rv;
-    nsCOMPtr<nsIFileOutputStream> stream(
-        do_CreateInstance("@mozilla.org/network/file-output-stream;1")
-    );
-    pipeStream = do_QueryInterface(stream, &rv);
-    if (NS_FAILED(rv)) return rv;
-    rv = stream->Init(file, -1, -1, 0);
-    if (NS_FAILED(rv)) return rv;
+    if (file) {
+        nsCOMPtr<nsIFileOutputStream> stream(
+            do_CreateInstance("@mozilla.org/network/file-output-stream;1")
+        );
+        pipeStream = do_QueryInterface(stream, &rv);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        rv = stream->Init(file, -1, -1, 0);
+        NS_ENSURE_SUCCESS(rv, rv);
+    } else {
+        nsCOMPtr<nsIStorageStream> storage;
+        rv = NS_NewStorageStream(STORAGE_STREAM_SEGMENT_SIZE, PRUint32(-1),
+                                 getter_AddRefs(storage));
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        rv = storage->GetOutputStream(0, getter_AddRefs(pipeStream));
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
     
     if (a_rec || v_rec) {
         NS_DispatchToMainThread(new MediaCallback(

@@ -49,6 +49,7 @@
 
 #include <nsIPipe.h>
 #include <nsIFileStreams.h>
+#include <nsIStorageStream.h>
 #include <nsIAsyncInputStream.h>
 #include <nsIAsyncOutputStream.h>
 #include <nsIDOMCanvasRenderingContext2D.h>
@@ -75,6 +76,7 @@
 #include "VideoSourceCanvas.h"
 
 #define SOCK_LEN 8192
+#define STORAGE_STREAM_SEGMENT_SIZE 4096
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
 #define MEDIA_RECORDER_CID { 0xc467b1f4, 0x551c, 0x4e2f, \
                            { 0xa6, 0xba, 0xcb, 0x7d, 0x79, 0x2d, 0x14, 0x52 }}
@@ -134,6 +136,8 @@ protected:
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
     nsIDOMCanvasRenderingContext2D *canvas;
+    nsIDOMHTMLAudioElement *mAudioElement;
+    JSContext* mJSCtx;
     
     nsCOMPtr<nsIOutputStream> pipeStream;
     nsCOMPtr<nsIAsyncInputStream> sockIn;
