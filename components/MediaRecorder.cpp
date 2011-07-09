@@ -114,6 +114,58 @@ MediaRecorder::WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr)
 }
 
 /*
+ * Preview audio (recording not in progress). Runs in a thread,
+ * the thread will be joined when recording starts, at which point
+ * the encode loop takes over doing the preview.
+ */
+void
+MediaRecorder::BeginPreviewAudio(void *data)
+{
+    PRInt16 *a_frames;
+    MediaRecorder *mr = static_cast<MediaRecorder*>(data);
+    int len = FRAMES_BUFFER * mr->aState->backend->GetFrameSize();
+
+    while (!mr->a_rec && !mr->a_stp) {
+        a_frames = mr->GetAudioPacket(len);
+        if (a_frames) {
+            PR_Free(a_frames);
+        }
+    }
+}
+
+void
+MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
+{
+    /* Write to <audio> element if available. It expects interleaved data */
+    if (!audio || !jsctx)
+        return;
+
+    int i, n;
+    float *data;
+    jsval arrayval;
+    PRUint32 retval;
+    JSObject *array;
+    js::TypedArray *typedarray;
+
+    n = len / aState->backend->GetFrameSize();
+    /* FIXME: Who is going to free this? */
+    array = js_CreateTypedArray(jsctx, js::TypedArray::TYPE_FLOAT32, (jsuint)n);
+    if (!array) {
+        fprintf(stderr, "could not create JS typedarray for <audio>!\n");
+        return;
+    }
+
+    arrayval = OBJECT_TO_JSVAL(array);
+    typedarray = js::TypedArray::fromJSObject(array);
+    data = (float *) typedarray->data;
+
+    for (i = 0; i < n; i++) {
+        data[i] = (float)((float)a_frames[i] / 32768.f);
+    }
+    audio->MozWriteAudio(arrayval, jsctx, &retval);
+}
+
+/*
  * Get an audio packet from the pipe.
  */
 PRInt16 *
@@ -140,34 +192,8 @@ MediaRecorder::GetAudioPacket(PRInt32 len)
         PR_Free(a_frames);
         return NULL;
     }
-    
-    /* Write to <audio> element if available. It expects interleaved data */
-    if (audio && jsctx) {
-        int i, n;
-        float *data;
-        jsval arrayval;
-        PRUint32 retval;
-        JSObject *array;
-        js::TypedArray *typedarray;
 
-        n = len / aState->backend->GetFrameSize();
-        /* FIXME: Who is going to free this? */
-        array = js_CreateTypedArray(jsctx, js::TypedArray::TYPE_FLOAT32, (jsuint)n);
-        if (!array) {
-            fprintf(stderr, "could not create JS typedarray for <audio>!\n");
-            return a_frames;
-        }
-
-        arrayval = OBJECT_TO_JSVAL(array);
-        typedarray = js::TypedArray::fromJSObject(array);
-        data = (float *) typedarray->data;
-
-        for (i = 0; i < n; i++) {
-            data[i] = (float)((float)a_frames[i] / 32768.f);
-        }
-        audio->MozWriteAudio(arrayval, jsctx, &retval);
-    }
-
+    PreviewAudio(a_frames, len);
     return a_frames;
 }
 
@@ -444,7 +470,9 @@ MediaRecorder::Init()
     jsctx = nsnull;
     audio = nsnull;
     canvas = nsnull;
+    preview = nsnull;
     pipeStream = nsnull;
+
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
     aState = (Audio *)PR_Calloc(1, sizeof(Audio));
     vState = (Video *)PR_Calloc(1, sizeof(Video));
@@ -776,10 +804,40 @@ MediaRecorder::BeginSessionThread(void *data)
             return;
         }
     }
+    if (params->audio) {
+        /* Setup <audio> for writing, if provided */
+        if (mr->audio)
+            mr->audio->MozSetup(params->chan, params->rate);
+        
+        /* Setup audio pipe */
+        rv = mr->MakePipe(
+            getter_AddRefs(mr->aState->aPipeIn),
+            getter_AddRefs(mr->aState->aPipeOut)
+        );
+        if (NS_FAILED(rv)) {
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not create audio pipe"
+            ));
+            return;
+        }
 
-    /* Setup <audio> for writing, if provided */
-    if (params->audio && mr->audio) {
-        mr->audio->MozSetup(params->chan, params->rate);
+        /* Start it up */
+        rv = mr->aState->backend->Start(mr->aState->aPipeOut);
+        if (NS_FAILED(rv)) {
+            NS_DispatchToMainThread(new MediaCallback(
+                mr->observer, "error", "internal: could not start audio session"
+            ));
+            return;
+        }
+
+        /* Spawn thread to preview audio */
+        mr->preview = PR_CreateThread(
+            PR_SYSTEM_THREAD,
+            MediaRecorder::BeginPreviewAudio, mr,
+            PR_PRIORITY_NORMAL,
+            PR_GLOBAL_THREAD,
+            PR_JOINABLE_THREAD, 0
+        );
     }
 
     mr->m_session = PR_TRUE;
@@ -809,16 +867,33 @@ MediaRecorder::EndSession()
         ));
         return NS_ERROR_FAILURE;
     }
-    
-    /* End video, audio doesn't need to be */
-    rv = vState->backend->Stop();
-    if (NS_FAILED(rv)) {
-        NS_DispatchToMainThread(new MediaCallback(
-            observer, "error", "could not stop video session"
-        ));
-        return NS_ERROR_FAILURE;
+
+    if (params->video) {
+        rv = vState->backend->Stop();
+        if (NS_FAILED(rv)) {
+            NS_DispatchToMainThread(new MediaCallback(
+                observer, "error", "could not stop video session"
+            ));
+            return NS_ERROR_FAILURE;
+        }
     }
-    
+
+    if (params->audio) {
+        rv = aState->backend->Stop();
+        if (NS_FAILED(rv)) {
+            NS_DispatchToMainThread(new MediaCallback(
+                observer, "error", "could not stop audio session"
+            ));
+            return NS_ERROR_FAILURE;
+        }
+
+        if (preview) {
+            a_stp = PR_TRUE;
+            PR_JoinThread(preview);
+            preview = nsnull;
+        }
+    }
+
     m_session = PR_FALSE;
     NS_DispatchToMainThread(new MediaCallback(
         observer, "session-ended", ""
@@ -881,16 +956,6 @@ MediaRecorder::BeginRecordingThread(void *data)
     /* Get ready for audio! */
     if (mr->params->audio) {
         mr->SetupVorbisBOS();
-        rv = mr->MakePipe(
-            getter_AddRefs(mr->aState->aPipeIn),
-            getter_AddRefs(mr->aState->aPipeOut)
-        );
-        if (NS_FAILED(rv)) {
-            NS_DispatchToMainThread(new MediaCallback(
-                mr->observer, "error", "internal: could not create audio pipe"
-            ));
-            return;
-        }
     }
     
     if (mr->params->video) {
@@ -902,16 +967,12 @@ MediaRecorder::BeginRecordingThread(void *data)
 
     if (mr->params->audio) {
         mr->SetupVorbisHeaders();
-        rv = mr->aState->backend->Start(mr->aState->aPipeOut);
-        if (NS_FAILED(rv)) {
-            /* FIXME: Stop and clean up video! */
-            NS_DispatchToMainThread(new MediaCallback(
-                mr->observer, "error", "internal: could not start audio recording"
-            ));
-            return;
-        }
+
+        /* Wait for preview thread to join */
         mr->a_rec = PR_TRUE;
         mr->a_stp = PR_FALSE;
+        PR_JoinThread(mr->preview);
+        mr->preview = nsnull;
     }
     
     /* Start off encoder after notifying observer */

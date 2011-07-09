@@ -133,6 +133,8 @@ protected:
 
     JSContext *jsctx;
     PRThread *thread;
+    PRThread *preview;
+
     PRBool m_session;
     PRBool a_stp, v_stp;
     PRBool a_rec, v_rec;
@@ -148,6 +150,7 @@ protected:
     
     static MediaRecorder *gMediaRecordingService;
 
+    static void BeginPreviewAudio(void *data);
     static void BeginSessionThread(void *data);
     static void BeginRecordingThread(void *data);
     static void EndRecordingThread(void *data);
@@ -159,6 +162,7 @@ protected:
     
     void Encode();
     void WriteAudio();
+    void PreviewAudio(PRInt16 *a_frames, int len);
     PRBool EncodeVideo(PRUint8 *v_frame, int len);
     PRBool EncodeAudio(PRInt16 *a_frames, int len);
     PRUint8 * GetVideoPacket(PRInt32 *len, PRFloat64 *times);
