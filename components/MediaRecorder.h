@@ -122,11 +122,12 @@ public:
     NS_DECL_ISUPPORTS
     NS_DECL_NSIAUDIOSAMPLE
     
+    void SetSample(JSObject *obj);
     virtual ~AudioSample();
     AudioSample(){}
 
 private:
-    jsval m_frames;
+    JSObject *m_obj;
 };
 
 class MediaRecorder : public IMediaRecorder

@@ -45,17 +45,16 @@ NS_IMPL_ISUPPORTS1(AudioSample, nsIAudioSample)
 AudioSample::~AudioSample()
 {}
 
-NS_IMETHODIMP
-AudioSample::SetFrames(const jsval &val)
+void
+AudioSample::SetSample(JSObject *obj)
 {
-    m_frames = val;
-    return NS_OK;
+    m_obj = obj;
 }
 
 NS_IMETHODIMP
 AudioSample::GetFrames(jsval *val)
 {
-    val = &m_frames;
+    *val = OBJECT_TO_JSVAL(m_obj);
     return NS_OK;
 }
 
@@ -181,7 +180,7 @@ MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
     js::TypedArray *typedarray;
 
     n = len / aState->backend->GetFrameSize();
-    /* FIXME: Who is going to free this? */
+    /* FIXME: Who is going to free this? This is a memleak */
     array = js_CreateTypedArray(jsctx, js::TypedArray::TYPE_FLOAT32, (jsuint)n);
     if (!array) {
         fprintf(stderr, "could not create JS typedarray for <audio>!\n");
@@ -201,10 +200,11 @@ MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
         audio->MozWriteAudio(arrayval, jsctx, &retval);
 
     if (sampler) {
-        nsCOMPtr<nsIAudioSample> sample = new AudioSample();
-        sample->SetFrames(arrayval);
+        AudioSample *sample = new AudioSample();
+        sample->SetSample(array);
+        nsCOMPtr<nsIAudioSample> sampleQ(sample);
         NS_DispatchToMainThread(new AudioSampleCallback(
-            sampler, sample
+            sampler, sampleQ
         ));
     }
 }

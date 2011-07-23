@@ -49,7 +49,7 @@ interface nsIMediaStateObserver : nsISupports
 [scriptable, uuid(C4bb02e5-c1d7-4cde-90be-842424bfc1cc)]
 interface nsIAudioSample : nsISupports
 {
-    attribute jsval frames;    
+    readonly attribute jsval frames;    
 };
 
 [scriptable, function, uuid(84dc6b74-56e6-44f9-8435-0647f71e7c2a)]

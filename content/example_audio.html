@@ -20,7 +20,7 @@
     let aud = document.getElementById("tehaudio");
 
     function onSampleReceived(sample) {
-        msg.innerHTML = "SAY WHAT " + sample;
+        msg.innerHTML = "SAY WHAT " + sample[0] + " // " + sample.length;
     }
 
     function onStateChange(type, arg) {

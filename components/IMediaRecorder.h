@@ -116,9 +116,8 @@ class NS_NO_VTABLE NS_SCRIPTABLE nsIAudioSample : public nsISupports {
 
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_IAUDIOSAMPLE_IID)
 
-  /* attribute jsval frames; */
+  /* readonly attribute jsval frames; */
   NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) = 0;
-  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames) = 0;
 
 };
 
@@ -126,18 +125,15 @@ class NS_NO_VTABLE NS_SCRIPTABLE nsIAudioSample : public nsISupports {
 
 /* Use this macro when declaring classes that implement this interface. */
 #define NS_DECL_NSIAUDIOSAMPLE \
-  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames); \
-  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames); 
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames); 
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object. */
 #define NS_FORWARD_NSIAUDIOSAMPLE(_to) \
-  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) { return _to GetFrames(aFrames); } \
-  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames) { return _to SetFrames(aFrames); } 
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) { return _to GetFrames(aFrames); } 
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
 #define NS_FORWARD_SAFE_NSIAUDIOSAMPLE(_to) \
-  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) { return !_to ? NS_ERROR_NULL_POINTER : _to->GetFrames(aFrames); } \
-  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames) { return !_to ? NS_ERROR_NULL_POINTER : _to->SetFrames(aFrames); } 
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) { return !_to ? NS_ERROR_NULL_POINTER : _to->GetFrames(aFrames); } 
 
 #if 0
 /* Use the code below as a template for the implementation class for this interface. */
@@ -171,12 +167,8 @@ nsAudioSample::~nsAudioSample()
   /* destructor code */
 }
 
-/* attribute jsval frames; */
+/* readonly attribute jsval frames; */
 NS_IMETHODIMP nsAudioSample::GetFrames(jsval *aFrames)
-{
-    return NS_ERROR_NOT_IMPLEMENTED;
-}
-NS_IMETHODIMP nsAudioSample::SetFrames(const jsval & aFrames)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }
