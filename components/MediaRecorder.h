@@ -116,6 +116,19 @@ typedef struct {
     PRUint32 fps_n, fps_d, width, height, rate, chan;
 } Properties;
 
+class AudioSample : public nsIAudioSample
+{
+public:
+    NS_DECL_ISUPPORTS
+    NS_DECL_NSIAUDIOSAMPLE
+    
+    virtual ~AudioSample();
+    AudioSample(){}
+
+private:
+    jsval m_frames;
+};
+
 class MediaRecorder : public IMediaRecorder
 {
 public:
@@ -146,7 +159,7 @@ protected:
     nsCOMPtr<nsIOutputStream> pipeStream;
     nsCOMPtr<nsIAsyncInputStream> sockIn;
     nsCOMPtr<nsIAsyncOutputStream> sockOut;
-    
+
     nsCOMPtr<nsIAudioSampler> sampler;
     nsCOMPtr<nsIMediaStateObserver> observer;
     

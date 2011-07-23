@@ -193,7 +193,11 @@ Rainbow.prototype = {
         this._input.type = 'file';
         
         // Start rainbow session
-        this._rainbow.beginSession(bag, ctx, audio, sampler, this._observer);
+        if (!sampler)
+            sampler = function() {};
+        this._rainbow.beginSession(bag, ctx, audio, function(sample) {
+            sampler(sample.frames);
+        }, this._observer);
         this._session = true;
     },
     

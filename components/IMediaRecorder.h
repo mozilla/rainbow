@@ -104,6 +104,87 @@ NS_IMETHODIMP nsMediaStateObserver::OnStateChange(const char *state, const char 
 #endif
 
 
+/* starting interface:    nsIAudioSample */
+#define NS_IAUDIOSAMPLE_IID_STR "c4bb02e5-c1d7-4cde-90be-842424bfc1cc"
+
+#define NS_IAUDIOSAMPLE_IID \
+  {0xc4bb02e5, 0xc1d7, 0x4cde, \
+    { 0x90, 0xbe, 0x84, 0x24, 0x24, 0xbf, 0xc1, 0xcc }}
+
+class NS_NO_VTABLE NS_SCRIPTABLE nsIAudioSample : public nsISupports {
+ public: 
+
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_IAUDIOSAMPLE_IID)
+
+  /* attribute jsval frames; */
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) = 0;
+  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames) = 0;
+
+};
+
+  NS_DEFINE_STATIC_IID_ACCESSOR(nsIAudioSample, NS_IAUDIOSAMPLE_IID)
+
+/* Use this macro when declaring classes that implement this interface. */
+#define NS_DECL_NSIAUDIOSAMPLE \
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames); \
+  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames); 
+
+/* Use this macro to declare functions that forward the behavior of this interface to another object. */
+#define NS_FORWARD_NSIAUDIOSAMPLE(_to) \
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) { return _to GetFrames(aFrames); } \
+  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames) { return _to SetFrames(aFrames); } 
+
+/* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
+#define NS_FORWARD_SAFE_NSIAUDIOSAMPLE(_to) \
+  NS_SCRIPTABLE NS_IMETHOD GetFrames(jsval *aFrames) { return !_to ? NS_ERROR_NULL_POINTER : _to->GetFrames(aFrames); } \
+  NS_SCRIPTABLE NS_IMETHOD SetFrames(const jsval & aFrames) { return !_to ? NS_ERROR_NULL_POINTER : _to->SetFrames(aFrames); } 
+
+#if 0
+/* Use the code below as a template for the implementation class for this interface. */
+
+/* Header file */
+class nsAudioSample : public nsIAudioSample
+{
+public:
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSIAUDIOSAMPLE
+
+  nsAudioSample();
+
+private:
+  ~nsAudioSample();
+
+protected:
+  /* additional members */
+};
+
+/* Implementation file */
+NS_IMPL_ISUPPORTS1(nsAudioSample, nsIAudioSample)
+
+nsAudioSample::nsAudioSample()
+{
+  /* member initializers and constructor code */
+}
+
+nsAudioSample::~nsAudioSample()
+{
+  /* destructor code */
+}
+
+/* attribute jsval frames; */
+NS_IMETHODIMP nsAudioSample::GetFrames(jsval *aFrames)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+NS_IMETHODIMP nsAudioSample::SetFrames(const jsval & aFrames)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+/* End of implementation class template. */
+#endif
+
+
 /* starting interface:    nsIAudioSampler */
 #define NS_IAUDIOSAMPLER_IID_STR "84dc6b74-56e6-44f9-8435-0647f71e7c2a"
 
@@ -116,8 +197,8 @@ class NS_NO_VTABLE NS_SCRIPTABLE nsIAudioSampler : public nsISupports {
 
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_IAUDIOSAMPLER_IID)
 
-  /* void onSampleReceived (in jsval frames); */
-  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames) = 0;
+  /* void onSampleReceived (in nsIAudioSample sample); */
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(nsIAudioSample *sample) = 0;
 
 };
 
@@ -125,15 +206,15 @@ class NS_NO_VTABLE NS_SCRIPTABLE nsIAudioSampler : public nsISupports {
 
 /* Use this macro when declaring classes that implement this interface. */
 #define NS_DECL_NSIAUDIOSAMPLER \
-  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames); 
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(nsIAudioSample *sample); 
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object. */
 #define NS_FORWARD_NSIAUDIOSAMPLER(_to) \
-  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames) { return _to OnSampleReceived(frames); } 
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(nsIAudioSample *sample) { return _to OnSampleReceived(sample); } 
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
 #define NS_FORWARD_SAFE_NSIAUDIOSAMPLER(_to) \
-  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames) { return !_to ? NS_ERROR_NULL_POINTER : _to->OnSampleReceived(frames); } 
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(nsIAudioSample *sample) { return !_to ? NS_ERROR_NULL_POINTER : _to->OnSampleReceived(sample); } 
 
 #if 0
 /* Use the code below as a template for the implementation class for this interface. */
@@ -167,8 +248,8 @@ nsAudioSampler::~nsAudioSampler()
   /* destructor code */
 }
 
-/* void onSampleReceived (in jsval frames); */
-NS_IMETHODIMP nsAudioSampler::OnSampleReceived(const jsval & frames)
+/* void onSampleReceived (in nsIAudioSample sample); */
+NS_IMETHODIMP nsAudioSampler::OnSampleReceived(nsIAudioSample *sample)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }

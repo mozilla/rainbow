@@ -19,8 +19,8 @@
     let but = document.getElementById("tehbutton");
     let aud = document.getElementById("tehaudio");
 
-    function onSampleReceived(samples) {
-        msg.innerHTML = "SAY WHAT " + samples;
+    function onSampleReceived(sample) {
+        msg.innerHTML = "SAY WHAT " + sample;
     }
 
     function onStateChange(type, arg) {

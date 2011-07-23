@@ -40,6 +40,24 @@
 #define TOLERANCE 0.050000
 
 NS_IMPL_ISUPPORTS1(MediaRecorder, IMediaRecorder)
+NS_IMPL_ISUPPORTS1(AudioSample, nsIAudioSample)
+
+AudioSample::~AudioSample()
+{}
+
+NS_IMETHODIMP
+AudioSample::SetFrames(const jsval &val)
+{
+    m_frames = val;
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+AudioSample::GetFrames(jsval *val)
+{
+    val = &m_frames;
+    return NS_OK;
+}
 
 MediaRecorder *MediaRecorder::gMediaRecordingService = nsnull;
 MediaRecorder *
@@ -80,9 +98,9 @@ private:
 
 class AudioSampleCallback : public nsRunnable {
 public:
-    AudioSampleCallback(nsIAudioSampler *slr, jsval *val) {
+    AudioSampleCallback(nsIAudioSampler *slr, nsIAudioSample *sample) {
         m_Slr = slr;
-        m_Val = *val;
+        m_Val = sample;
     }
     
     NS_IMETHOD Run() {
@@ -90,7 +108,7 @@ public:
     }
     
 private:
-    jsval m_Val;
+    nsCOMPtr<nsIAudioSample> m_Val;
     nsCOMPtr<nsIAudioSampler> m_Slr;
 };
 
@@ -183,8 +201,10 @@ MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
         audio->MozWriteAudio(arrayval, jsctx, &retval);
 
     if (sampler) {
+        nsCOMPtr<nsIAudioSample> sample = new AudioSample();
+        sample->SetFrames(arrayval);
         NS_DispatchToMainThread(new AudioSampleCallback(
-            sampler, &arrayval
+            sampler, sample
         ));
     }
 }
