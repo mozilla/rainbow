@@ -146,6 +146,8 @@ protected:
     nsCOMPtr<nsIOutputStream> pipeStream;
     nsCOMPtr<nsIAsyncInputStream> sockIn;
     nsCOMPtr<nsIAsyncOutputStream> sockOut;
+    
+    nsCOMPtr<nsIAudioSampler> sampler;
     nsCOMPtr<nsIMediaStateObserver> observer;
     
     static MediaRecorder *gMediaRecordingService;

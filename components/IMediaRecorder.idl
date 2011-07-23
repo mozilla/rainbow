@@ -46,6 +46,12 @@ interface nsIMediaStateObserver : nsISupports
     void onStateChange(in string state, in string args);
 };
 
+[scriptable, function, uuid(84dc6b74-56e6-44f9-8435-0647f71e7c2a)]
+interface nsIAudioSampler : nsISupports
+{
+    void onSampleReceived(in jsval frames);
+};
+
 [scriptable, uuid(c467b1f4-551c-4e2f-a6ba-cb7d792d1452)]
 interface IMediaRecorder : nsISupports
 {
@@ -53,6 +59,7 @@ interface IMediaRecorder : nsISupports
     void beginSession(in nsIPropertyBag2 prop,
         in nsIDOMCanvasRenderingContext2D ctx,
         in nsIDOMHTMLAudioElement audio,
+        in nsIAudioSampler slr,
         in nsIMediaStateObserver obs);
     void endSession();
     void beginRecording(in nsILocalFile file);

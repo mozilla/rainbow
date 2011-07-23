@@ -104,6 +104,79 @@ NS_IMETHODIMP nsMediaStateObserver::OnStateChange(const char *state, const char 
 #endif
 
 
+/* starting interface:    nsIAudioSampler */
+#define NS_IAUDIOSAMPLER_IID_STR "84dc6b74-56e6-44f9-8435-0647f71e7c2a"
+
+#define NS_IAUDIOSAMPLER_IID \
+  {0x84dc6b74, 0x56e6, 0x44f9, \
+    { 0x84, 0x35, 0x06, 0x47, 0xf7, 0x1e, 0x7c, 0x2a }}
+
+class NS_NO_VTABLE NS_SCRIPTABLE nsIAudioSampler : public nsISupports {
+ public: 
+
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_IAUDIOSAMPLER_IID)
+
+  /* void onSampleReceived (in jsval frames); */
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames) = 0;
+
+};
+
+  NS_DEFINE_STATIC_IID_ACCESSOR(nsIAudioSampler, NS_IAUDIOSAMPLER_IID)
+
+/* Use this macro when declaring classes that implement this interface. */
+#define NS_DECL_NSIAUDIOSAMPLER \
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames); 
+
+/* Use this macro to declare functions that forward the behavior of this interface to another object. */
+#define NS_FORWARD_NSIAUDIOSAMPLER(_to) \
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames) { return _to OnSampleReceived(frames); } 
+
+/* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
+#define NS_FORWARD_SAFE_NSIAUDIOSAMPLER(_to) \
+  NS_SCRIPTABLE NS_IMETHOD OnSampleReceived(const jsval & frames) { return !_to ? NS_ERROR_NULL_POINTER : _to->OnSampleReceived(frames); } 
+
+#if 0
+/* Use the code below as a template for the implementation class for this interface. */
+
+/* Header file */
+class nsAudioSampler : public nsIAudioSampler
+{
+public:
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSIAUDIOSAMPLER
+
+  nsAudioSampler();
+
+private:
+  ~nsAudioSampler();
+
+protected:
+  /* additional members */
+};
+
+/* Implementation file */
+NS_IMPL_ISUPPORTS1(nsAudioSampler, nsIAudioSampler)
+
+nsAudioSampler::nsAudioSampler()
+{
+  /* member initializers and constructor code */
+}
+
+nsAudioSampler::~nsAudioSampler()
+{
+  /* destructor code */
+}
+
+/* void onSampleReceived (in jsval frames); */
+NS_IMETHODIMP nsAudioSampler::OnSampleReceived(const jsval & frames)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+/* End of implementation class template. */
+#endif
+
+
 /* starting interface:    IMediaRecorder */
 #define IMEDIARECORDER_IID_STR "c467b1f4-551c-4e2f-a6ba-cb7d792d1452"
 
@@ -116,8 +189,8 @@ class NS_NO_VTABLE NS_SCRIPTABLE IMediaRecorder : public nsISupports {
 
   NS_DECLARE_STATIC_IID_ACCESSOR(IMEDIARECORDER_IID)
 
-  /* [implicit_jscontext] void beginSession (in nsIPropertyBag2 prop, in nsIDOMCanvasRenderingContext2D ctx, in nsIDOMHTMLAudioElement audio, in nsIMediaStateObserver obs); */
-  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIMediaStateObserver *obs, JSContext *cx) = 0;
+  /* [implicit_jscontext] void beginSession (in nsIPropertyBag2 prop, in nsIDOMCanvasRenderingContext2D ctx, in nsIDOMHTMLAudioElement audio, in nsIAudioSampler slr, in nsIMediaStateObserver obs); */
+  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIAudioSampler *slr, nsIMediaStateObserver *obs, JSContext *cx) = 0;
 
   /* void endSession (); */
   NS_SCRIPTABLE NS_IMETHOD EndSession(void) = 0;
@@ -134,21 +207,21 @@ class NS_NO_VTABLE NS_SCRIPTABLE IMediaRecorder : public nsISupports {
 
 /* Use this macro when declaring classes that implement this interface. */
 #define NS_DECL_IMEDIARECORDER \
-  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIMediaStateObserver *obs, JSContext *cx); \
+  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIAudioSampler *slr, nsIMediaStateObserver *obs, JSContext *cx); \
   NS_SCRIPTABLE NS_IMETHOD EndSession(void); \
   NS_SCRIPTABLE NS_IMETHOD BeginRecording(nsILocalFile *file); \
   NS_SCRIPTABLE NS_IMETHOD EndRecording(void); 
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object. */
 #define NS_FORWARD_IMEDIARECORDER(_to) \
-  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIMediaStateObserver *obs, JSContext *cx) { return _to BeginSession(prop, ctx, audio, obs, cx); } \
+  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIAudioSampler *slr, nsIMediaStateObserver *obs, JSContext *cx) { return _to BeginSession(prop, ctx, audio, slr, obs, cx); } \
   NS_SCRIPTABLE NS_IMETHOD EndSession(void) { return _to EndSession(); } \
   NS_SCRIPTABLE NS_IMETHOD BeginRecording(nsILocalFile *file) { return _to BeginRecording(file); } \
   NS_SCRIPTABLE NS_IMETHOD EndRecording(void) { return _to EndRecording(); } 
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
 #define NS_FORWARD_SAFE_IMEDIARECORDER(_to) \
-  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIMediaStateObserver *obs, JSContext *cx) { return !_to ? NS_ERROR_NULL_POINTER : _to->BeginSession(prop, ctx, audio, obs, cx); } \
+  NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIAudioSampler *slr, nsIMediaStateObserver *obs, JSContext *cx) { return !_to ? NS_ERROR_NULL_POINTER : _to->BeginSession(prop, ctx, audio, slr, obs, cx); } \
   NS_SCRIPTABLE NS_IMETHOD EndSession(void) { return !_to ? NS_ERROR_NULL_POINTER : _to->EndSession(); } \
   NS_SCRIPTABLE NS_IMETHOD BeginRecording(nsILocalFile *file) { return !_to ? NS_ERROR_NULL_POINTER : _to->BeginRecording(file); } \
   NS_SCRIPTABLE NS_IMETHOD EndRecording(void) { return !_to ? NS_ERROR_NULL_POINTER : _to->EndRecording(); } 
@@ -185,8 +258,8 @@ _MYCLASS_::~_MYCLASS_()
   /* destructor code */
 }
 
-/* [implicit_jscontext] void beginSession (in nsIPropertyBag2 prop, in nsIDOMCanvasRenderingContext2D ctx, in nsIDOMHTMLAudioElement audio, in nsIMediaStateObserver obs); */
-NS_IMETHODIMP _MYCLASS_::BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIMediaStateObserver *obs, JSContext *cx)
+/* [implicit_jscontext] void beginSession (in nsIPropertyBag2 prop, in nsIDOMCanvasRenderingContext2D ctx, in nsIDOMHTMLAudioElement audio, in nsIAudioSampler slr, in nsIMediaStateObserver obs); */
+NS_IMETHODIMP _MYCLASS_::BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIDOMHTMLAudioElement *audio, nsIAudioSampler *slr, nsIMediaStateObserver *obs, JSContext *cx)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }

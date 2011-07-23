@@ -95,9 +95,9 @@ var RainbowObserver = {
         );
         sandbox.window = subject.wrappedJSObject;
 
-        sandbox.importFunction(function(loc, prop, ctx, audio, obs) {
+        sandbox.importFunction(function(loc, prop, ctx, audio, slr, obs) {
             rainbow._verifyPermission(window, loc, function(allowed) {
-                if (allowed) rainbow.beginSession(prop, ctx, audio, obs);
+                if (allowed) rainbow.beginSession(prop, ctx, audio, slr, obs);
                 else throw "Permission denied";
             });
         }, "sessStart");

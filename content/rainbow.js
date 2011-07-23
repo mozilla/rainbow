@@ -169,7 +169,7 @@ Rainbow.prototype = {
         }
     },
     
-    beginSession: function(prop, ctx, audio, obs) {
+    beginSession: function(prop, ctx, audio, sampler, obs) {
         if (this._session)
             throw "Session already in progress";
 
@@ -193,7 +193,7 @@ Rainbow.prototype = {
         this._input.type = 'file';
         
         // Start rainbow session
-        this._rainbow.beginSession(bag, ctx, audio, this._observer);
+        this._rainbow.beginSession(bag, ctx, audio, sampler, this._observer);
         this._session = true;
     },
     

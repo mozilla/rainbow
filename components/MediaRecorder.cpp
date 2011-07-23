@@ -59,7 +59,7 @@ MediaRecorder::GetSingleton()
 }
 
 /*
- * Special runnable object to dispatch JS callback on main thread
+ * Special runnable objects to dispatch JS callback on main thread
  */
 class MediaCallback : public nsRunnable {
 public:
@@ -76,6 +76,22 @@ public:
 private:
     nsCOMPtr<nsIMediaStateObserver> m_Obs;
     char m_Msg[128]; char m_Arg[256];
+};
+
+class AudioSampleCallback : public nsRunnable {
+public:
+    AudioSampleCallback(nsIAudioSampler *slr, jsval *val) {
+        m_Slr = slr;
+        m_Val = *val;
+    }
+    
+    NS_IMETHOD Run() {
+        return m_Slr->OnSampleReceived(m_Val);
+    }
+    
+private:
+    jsval m_Val;
+    nsCOMPtr<nsIAudioSampler> m_Slr;
 };
 
 void
@@ -136,8 +152,7 @@ MediaRecorder::BeginPreviewAudio(void *data)
 void
 MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
 {
-    /* Write to <audio> element if available. It expects interleaved data */
-    if (!audio || !jsctx)
+    if (!jsctx)
         return;
 
     int i, n;
@@ -162,7 +177,16 @@ MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
     for (i = 0; i < n; i++) {
         data[i] = (float)((float)a_frames[i] / 32768.f);
     }
-    audio->MozWriteAudio(arrayval, jsctx, &retval);
+
+    /* Write to <audio> element if available. It expects interleaved data */
+    if (audio)
+        audio->MozWriteAudio(arrayval, jsctx, &retval);
+
+    if (sampler) {
+        NS_DispatchToMainThread(new AudioSampleCallback(
+            sampler, &arrayval
+        ));
+    }
 }
 
 /*
@@ -471,6 +495,7 @@ MediaRecorder::Init()
     audio = nsnull;
     canvas = nsnull;
     preview = nsnull;
+    sampler = nsnull;
     pipeStream = nsnull;
 
     params = (Properties *)PR_Calloc(1, sizeof(Properties));
@@ -717,6 +742,7 @@ MediaRecorder::BeginSession(
     nsIPropertyBag2 *prop,
     nsIDOMCanvasRenderingContext2D *ctx,
     nsIDOMHTMLAudioElement *actx,
+    nsIAudioSampler *slr,
     nsIMediaStateObserver *obs,
     JSContext *jctx
 )
@@ -725,6 +751,7 @@ MediaRecorder::BeginSession(
     audio = actx;
     jsctx = jctx;
     observer = obs;
+    sampler = slr;
     ParseProperties(prop);
     
     if (m_session) {
