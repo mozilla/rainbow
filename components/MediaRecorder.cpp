@@ -97,13 +97,46 @@ private:
 
 class AudioSampleCallback : public nsRunnable {
 public:
-    AudioSampleCallback(nsIAudioSampler *slr, nsIAudioSample *sample) {
-        m_Slr = slr;
-        m_Val = sample;
+    AudioSampleCallback(nsIAudioSampler *slr, PRInt16 *a_frames, int n, JSContext *jsctx) {
+        int i;
+        float *data;
+        jsval arrayval;
+        JSObject *array;
+        js::TypedArray *typedarray;
+
+        /* FIXME: Who is going to free this? This is a memleak */
+        array = js_CreateTypedArray(jsctx, js::TypedArray::TYPE_FLOAT32, (jsuint)n);
+        if (!array) {
+            fprintf(stderr, "could not create JS typedarray for <audio>!\n");
+            return;
+        }
+
+        arrayval = OBJECT_TO_JSVAL(array);
+        typedarray = js::TypedArray::fromJSObject(array);
+        data = (float *) typedarray->data;
+
+        for (i = 0; i < n; i++) {
+            data[i] = (float)((float)a_frames[i] / 32768.f);
+        }
+
+        /* Write to <audio> element if available. It expects interleaved data */
+        //if (audio)
+            //audio->MozWriteAudio(arrayval, jsctx, &retval);
+
+        if (slr) {
+            AudioSample *sample = new AudioSample();
+            sample->SetSample(array);
+            nsCOMPtr<nsIAudioSample> sampleQ(sample);
+
+            m_Slr = slr;
+            m_Val = sample;
+        }
     }
     
     NS_IMETHOD Run() {
-        return m_Slr->OnSampleReceived(m_Val);
+        if (m_Slr && m_Val)
+            m_Slr->OnSampleReceived(m_Val);
+        return NS_OK;
     }
     
 private:
@@ -171,42 +204,10 @@ MediaRecorder::PreviewAudio(PRInt16 *a_frames, int len)
 {
     if (!jsctx)
         return;
-
-    int i, n;
-    float *data;
-    jsval arrayval;
-    PRUint32 retval;
-    JSObject *array;
-    js::TypedArray *typedarray;
-
-    n = len / aState->backend->GetFrameSize();
-    /* FIXME: Who is going to free this? This is a memleak */
-    array = js_CreateTypedArray(jsctx, js::TypedArray::TYPE_FLOAT32, (jsuint)n);
-    if (!array) {
-        fprintf(stderr, "could not create JS typedarray for <audio>!\n");
-        return;
-    }
-
-    arrayval = OBJECT_TO_JSVAL(array);
-    typedarray = js::TypedArray::fromJSObject(array);
-    data = (float *) typedarray->data;
-
-    for (i = 0; i < n; i++) {
-        data[i] = (float)((float)a_frames[i] / 32768.f);
-    }
-
-    /* Write to <audio> element if available. It expects interleaved data */
-    if (audio)
-        audio->MozWriteAudio(arrayval, jsctx, &retval);
-
-    if (sampler) {
-        AudioSample *sample = new AudioSample();
-        sample->SetSample(array);
-        nsCOMPtr<nsIAudioSample> sampleQ(sample);
-        NS_DispatchToMainThread(new AudioSampleCallback(
-            sampler, sampleQ
-        ));
-    }
+    
+    NS_DispatchToMainThread(new AudioSampleCallback(
+        sampler, a_frames, len / aState->backend->GetFrameSize(), jsctx
+    ));
 }
 
 /*
