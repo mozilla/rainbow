@@ -35,7 +35,7 @@
     { 0xa6, 0xe2, 0x46, 0x6c, 0x89, 0x9b, 0xdd, 0xe4 }}
 
 class NS_NO_VTABLE NS_SCRIPTABLE nsIMediaStateObserver : public nsISupports {
- public: 
+ public:
 
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_IMEDIASTATEOBSERVER_IID)
 
@@ -48,15 +48,15 @@ class NS_NO_VTABLE NS_SCRIPTABLE nsIMediaStateObserver : public nsISupports {
 
 /* Use this macro when declaring classes that implement this interface. */
 #define NS_DECL_NSIMEDIASTATEOBSERVER \
-  NS_SCRIPTABLE NS_IMETHOD OnStateChange(const char *state, const char *args); 
+  NS_SCRIPTABLE NS_IMETHOD OnStateChange(const char *state, const char *args);
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object. */
 #define NS_FORWARD_NSIMEDIASTATEOBSERVER(_to) \
-  NS_SCRIPTABLE NS_IMETHOD OnStateChange(const char *state, const char *args) { return _to OnStateChange(state, args); } 
+  NS_SCRIPTABLE NS_IMETHOD OnStateChange(const char *state, const char *args) { return _to OnStateChange(state, args); }
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
 #define NS_FORWARD_SAFE_NSIMEDIASTATEOBSERVER(_to) \
-  NS_SCRIPTABLE NS_IMETHOD OnStateChange(const char *state, const char *args) { return !_to ? NS_ERROR_NULL_POINTER : _to->OnStateChange(state, args); } 
+  NS_SCRIPTABLE NS_IMETHOD OnStateChange(const char *state, const char *args) { return !_to ? NS_ERROR_NULL_POINTER : _to->OnStateChange(state, args); }
 
 #if 0
 /* Use the code below as a template for the implementation class for this interface. */
@@ -108,7 +108,7 @@ NS_IMETHODIMP nsMediaStateObserver::OnStateChange(const char *state, const char 
     { 0xa6, 0xba, 0xcb, 0x7d, 0x79, 0x2d, 0x14, 0x52 }}
 
 class NS_NO_VTABLE NS_SCRIPTABLE IMediaRecorder : public nsISupports {
- public: 
+ public:
 
   NS_DECLARE_STATIC_IID_ACCESSOR(IMEDIARECORDER_IID)
 
@@ -133,21 +133,21 @@ class NS_NO_VTABLE NS_SCRIPTABLE IMediaRecorder : public nsISupports {
   NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIMediaStateObserver *obs); \
   NS_SCRIPTABLE NS_IMETHOD EndSession(void); \
   NS_SCRIPTABLE NS_IMETHOD BeginRecording(nsILocalFile *file); \
-  NS_SCRIPTABLE NS_IMETHOD EndRecording(void); 
+  NS_SCRIPTABLE NS_IMETHOD EndRecording(void);
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object. */
 #define NS_FORWARD_IMEDIARECORDER(_to) \
   NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIMediaStateObserver *obs) { return _to BeginSession(prop, ctx, obs); } \
   NS_SCRIPTABLE NS_IMETHOD EndSession(void) { return _to EndSession(); } \
   NS_SCRIPTABLE NS_IMETHOD BeginRecording(nsILocalFile *file) { return _to BeginRecording(file); } \
-  NS_SCRIPTABLE NS_IMETHOD EndRecording(void) { return _to EndRecording(); } 
+  NS_SCRIPTABLE NS_IMETHOD EndRecording(void) { return _to EndRecording(); }
 
 /* Use this macro to declare functions that forward the behavior of this interface to another object in a safe way. */
 #define NS_FORWARD_SAFE_IMEDIARECORDER(_to) \
   NS_SCRIPTABLE NS_IMETHOD BeginSession(nsIPropertyBag2 *prop, nsIDOMCanvasRenderingContext2D *ctx, nsIMediaStateObserver *obs) { return !_to ? NS_ERROR_NULL_POINTER : _to->BeginSession(prop, ctx, obs); } \
   NS_SCRIPTABLE NS_IMETHOD EndSession(void) { return !_to ? NS_ERROR_NULL_POINTER : _to->EndSession(); } \
   NS_SCRIPTABLE NS_IMETHOD BeginRecording(nsILocalFile *file) { return !_to ? NS_ERROR_NULL_POINTER : _to->BeginRecording(file); } \
-  NS_SCRIPTABLE NS_IMETHOD EndRecording(void) { return !_to ? NS_ERROR_NULL_POINTER : _to->EndRecording(); } 
+  NS_SCRIPTABLE NS_IMETHOD EndRecording(void) { return !_to ? NS_ERROR_NULL_POINTER : _to->EndRecording(); }
 
 #if 0
 /* Use the code below as a template for the implementation class for this interface. */

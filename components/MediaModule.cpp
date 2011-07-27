@@ -56,7 +56,7 @@ static const mozilla::Module MediaRecorderModule = {
     mozilla::Module::kVersion,
     kMediaCIDs,
     kMediaContracts,
-    NULL   
+    NULL
 };
 
 NSMODULE_DEFN(nsMediaRecorder) = &MediaRecorderModule;

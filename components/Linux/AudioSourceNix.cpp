@@ -51,7 +51,7 @@ AudioSourceNix::AudioSourceNix(int c, int r)
 
     err = snd_pcm_hw_params_any(device, params);
     if (err < 0) { g2g = PR_FALSE; return; }
-    
+
     err = snd_pcm_hw_params_set_access(
         device, params, SND_PCM_ACCESS_RW_INTERLEAVED
     );
@@ -101,7 +101,7 @@ AudioSourceNix::Start(nsIOutputStream *pipe)
 {
     int err;
     output = pipe;
-    
+
     if (!g2g) return NS_ERROR_FAILURE;
 
     err = snd_pcm_open(&device, ADDR, SND_PCM_STREAM_CAPTURE, 0);

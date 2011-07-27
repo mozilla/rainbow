@@ -63,7 +63,7 @@ public:
     int GetFrameSize();
     PRUint32 GetFPSN();
     PRUint32 GetFPSD();
-    
+
     /* When this function is called, in addition to continue painting
      * a preview on the canvas, you must write i420 sample to 'pipe'.
      * It is an error to call StartRecording without a preceding Start call.
@@ -72,18 +72,18 @@ public:
      */
     nsresult StartRecording(nsIOutputStream *pipe);
     nsresult StopRecording();
-    
+
     /* Your implementation is responsible for painting a live preview on
      * 'ctx' when Start() is called. You may use the helper class
      * 'CanvasRenderer' for this purpose.
      */
     virtual nsresult Start(nsIDOMCanvasRenderingContext2D *ctx) = 0;
-    
+
     /* Stop writing samples to the pipe, as well as live preview and cleanup
      * completely.
      */
     virtual nsresult Stop() = 0;
-    
+
 protected:
     /* Zombie notifier */
     PRBool g2g;
@@ -128,4 +128,3 @@ private:
 };
 
 #endif
-

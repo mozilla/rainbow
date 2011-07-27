@@ -69,11 +69,11 @@ public:
         strcpy(m_Msg, msg);
         strcpy(m_Arg, arg);
     }
-    
+
     NS_IMETHOD Run() {
         return m_Obs->OnStateChange((char *)m_Msg, (char *)m_Arg);
     }
-    
+
 private:
     nsCOMPtr<nsIMediaStateObserver> m_Obs;
     char m_Msg[128]; char m_Arg[256];
@@ -123,12 +123,12 @@ MediaRecorder::GetAudioPacket(PRInt32 len)
     nsresult rv;
     PRUint32 rd;
     PRInt16 *a_frames;
-    
+
     a_frames = (PRInt16 *) PR_Calloc(len, sizeof(PRUint8));
     do aState->aPipeIn->Available(&rd);
         while ((rd < (PRUint32)len) && !a_stp);
     rv = aState->aPipeIn->Read((char *)a_frames, len, &rd);
-    
+
     if (rd == 0) {
         /* EOF. We're done. */
         PR_Free(a_frames);
@@ -141,7 +141,7 @@ MediaRecorder::GetAudioPacket(PRInt32 len)
         PR_Free(a_frames);
         return NULL;
     }
-    
+
     return a_frames;
 }
 
@@ -166,7 +166,7 @@ MediaRecorder::EncodeAudio(PRInt16 *a_frames, int len)
     /* Tell libvorbis to do its thing */
     vorbis_analysis_wrote(&aState->vd, n);
     WriteAudio();
-    
+
     return PR_TRUE;
 }
 
@@ -179,18 +179,18 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
     nsresult rv;
     PRUint32 rd;
     PRUint8 *v_frame;
-    
+
     /* Get video frame header */
     rv = vState->vPipeIn->Read((char *)times, sizeof(PRFloat64), &rd);
     rv = vState->vPipeIn->Read((char *)len, sizeof(PRUint32), &rd);
-    
+
     //fprintf(stderr, "Got %d video packets at %f\n", *len / vState->backend->GetFrameSize(), *times);
-    
+
     v_frame = (PRUint8 *)PR_Calloc(*len, sizeof(PRUint8));
     do vState->vPipeIn->Available(&rd);
         while ((rd < (PRUint32)*len) && !v_stp);
     rv = vState->vPipeIn->Read((char *)v_frame, *len, &rd);
-    
+
     if (rd == 0) {
         PR_Free(v_frame);
         return NULL;
@@ -200,7 +200,7 @@ MediaRecorder::GetVideoPacket(PRInt32 *len, PRFloat64 *times)
         PR_Free(v_frame);
         return NULL;
     }
-    
+
     return v_frame;
 }
 
@@ -247,7 +247,7 @@ MediaRecorder::EncodeVideo(PRUint8 *v_frame, int len)
         rv = WriteData(vState->og.header, vState->og.header_len, &wr);
         rv = WriteData(vState->og.body, vState->og.body_len, &wr);
     }
-    
+
     return PR_TRUE;
 }
 
@@ -292,15 +292,15 @@ MediaRecorder::Encode()
     int a_frame_size = aState->backend->GetFrameSize();
     int a_frame_total = a_frame_num * a_frame_size;
     PRFloat64 v_frame_time_length = (PRFloat64)1.0 / static_cast<PRFloat64>(v_fps);
-    
+
     PRUint8 *v_frame = NULL;
     PRInt16 *a_frames = NULL;
     PRUint8 *v_frame_most_recent = NULL;
-    
+
     PRInt32 vlen;
     PRBool should_end = PR_FALSE;
     PRFloat64 atime, delta, current_audio_time = 0, vtime = 0;
-    
+
     if (v_rec && a_rec) {
         /* Check if audio or video started first, and set that as baseline */
         rv = aState->aPipeIn->Read((char *)&atime, sizeof(PRFloat64), &rd);
@@ -310,14 +310,14 @@ MediaRecorder::Encode()
             goto finish;
         }
         fprintf(stderr, "Video stream started at %f\n", vtime);
-        
+
         while (vtime > atime) {
             /* Fast forward audio to catch up with video */
             PR_Free(GetAudioPacket(a_frame_total));
             atime += v_frame_time_length;
         }
         current_audio_time = atime;
-        
+
 multiplex:
         if (!(a_frames = GetAudioPacket(a_frame_total))) {
             should_end = PR_TRUE;
@@ -331,7 +331,7 @@ multiplex:
         }
         PR_Free(a_frames);
         a_frames = NULL;
-        
+
         /* Experience also suggests that the audio stream is more or less
          * consistent; so the question really is if we need to duplicate or
          * drop video packets to match the FPS that we committed to. First
@@ -349,7 +349,7 @@ video:
             }
             delta = vtime - current_audio_time;
         }
-        
+
         if (delta < TOLERANCE) {
             /* This video frame appeared right after the audio frame, but
              * within our tolerance levels, so we encode it and keep a
@@ -365,11 +365,11 @@ video:
                 goto finish;
             }
         }
-        
+
         if (should_end)
             return;
         goto multiplex;
-        
+
     } else if (v_rec && !a_rec) {
         while (!v_stp) {
             if (!(v_frame = GetVideoPacket(&vlen, &vtime))) {
@@ -396,11 +396,11 @@ video:
             PR_Free(a_frames); a_frames = NULL;
         }
     }
-    
+
 finish:
     if (v_frame) PR_Free(v_frame);
     if (a_frames) PR_Free(a_frames);
-    
+
 }
 
 
@@ -665,14 +665,14 @@ MediaRecorder::BeginSession(
     canvas = ctx;
     observer = obs;
     ParseProperties(prop);
-    
+
     if (m_session) {
         NS_DispatchToMainThread(new MediaCallback(
             observer, "error", "session already in progress"
         ));
         return NS_ERROR_FAILURE;
     }
-    
+
     PR_CreateThread(
         PR_SYSTEM_THREAD,
         MediaRecorder::BeginSessionThread, this,
@@ -688,7 +688,7 @@ MediaRecorder::BeginSession(
  */
 void
 MediaRecorder::BeginSessionThread(void *data)
-{   
+{
     nsresult rv;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
     Properties *params = mr->params;
@@ -696,12 +696,12 @@ MediaRecorder::BeginSessionThread(void *data)
     /* Setup backends */
     mr->aState->backend = new AudioSourceNix(params->chan, params->rate);
     mr->vState->backend = new VideoSourceGIPS(params->width, params->height);
- 
+
     /* Is the given canvas source or destination? */
     if (params->canvas) {
         mr->vState->backend = new VideoSourceCanvas(params->width, params->height);
     }
-       
+
     /* Update parameters. What we asked for were just hints,
      * may not end up the same */
     params->fps_n = mr->vState->backend->GetFPSN();
@@ -756,14 +756,14 @@ MediaRecorder::EndSession()
         ));
         return NS_ERROR_FAILURE;
     }
-    
+
     if (a_rec || v_rec) {
         NS_DispatchToMainThread(new MediaCallback(
             observer, "error", "recording in progress"
         ));
         return NS_ERROR_FAILURE;
     }
-    
+
     /* End video, audio doesn't need to be */
     rv = vState->backend->Stop();
     if (NS_FAILED(rv)) {
@@ -772,12 +772,12 @@ MediaRecorder::EndSession()
         ));
         return NS_ERROR_FAILURE;
     }
-    
+
     m_session = PR_FALSE;
     NS_DispatchToMainThread(new MediaCallback(
         observer, "session-ended", ""
     ));
-    
+
     return NS_OK;
 }
 
@@ -793,14 +793,14 @@ MediaRecorder::BeginRecording(nsILocalFile *file)
     if (NS_FAILED(rv)) return rv;
     rv = stream->Init(file, -1, -1, 0);
     if (NS_FAILED(rv)) return rv;
-    
+
     if (a_rec || v_rec) {
         NS_DispatchToMainThread(new MediaCallback(
             observer, "error", "recording already in progress"
         ));
         return NS_ERROR_FAILURE;
     }
-    
+
     thread = PR_CreateThread(
         PR_SYSTEM_THREAD,
         MediaRecorder::BeginRecordingThread, this,
@@ -816,7 +816,7 @@ MediaRecorder::BeginRecordingThread(void *data)
 {
     nsresult rv;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
-    
+
     /* Get ready for video! */
     if (mr->params->video) {
         mr->SetupTheoraBOS();
@@ -846,7 +846,7 @@ MediaRecorder::BeginRecordingThread(void *data)
             return;
         }
     }
-    
+
     if (mr->params->video) {
         mr->v_rec = PR_TRUE;
         mr->v_stp = PR_FALSE;
@@ -867,7 +867,7 @@ MediaRecorder::BeginRecordingThread(void *data)
         mr->a_rec = PR_TRUE;
         mr->a_stp = PR_FALSE;
     }
-    
+
     /* Start off encoder after notifying observer */
     NS_DispatchToMainThread(new MediaCallback(
         mr->observer, "record-began", ""
@@ -887,7 +887,7 @@ MediaRecorder::EndRecording()
         ));
         return NS_ERROR_FAILURE;
     }
-    
+
     PR_CreateThread(
         PR_SYSTEM_THREAD,
         MediaRecorder::EndRecordingThread, this,
@@ -907,7 +907,7 @@ MediaRecorder::EndRecordingThread(void *data)
     nsresult rv;
     PRUint32 wr;
     MediaRecorder *mr = static_cast<MediaRecorder*>(data);
-    
+
     if (mr->v_rec) {
         rv = mr->vState->backend->StopRecording();
         if (NS_FAILED(rv)) {

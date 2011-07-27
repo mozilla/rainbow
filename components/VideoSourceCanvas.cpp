@@ -73,7 +73,7 @@ VideoSourceCanvas::Stop()
 {
     if (!g2g)
         return NS_ERROR_FAILURE;
-    
+
     running = PR_FALSE;
     PR_JoinThread(sampler);
     return NS_OK;
@@ -85,7 +85,7 @@ VideoSourceCanvas::Grabber(void *data)
     nsresult rv;
     PRUint32 wr;
     VideoSourceCanvas *vs = static_cast<VideoSourceCanvas*>(data);
-    
+
     int isize = vs->GetFrameSize();
     int fsize = vs->width * vs->height * 4;
     char *i420 = (char *)PR_Calloc(isize, 1);
@@ -97,14 +97,14 @@ VideoSourceCanvas::Grabber(void *data)
     while (vs->running) {
         PR_Sleep(ticks);
         if (vs->is_rec == PR_FALSE) continue;
-        
+
         rv = vs->vCanvas->GetImageData_explicit(
             0, 0, vs->width, vs->height, rgb32, fsize
         );
         if (NS_FAILED(rv)) continue;
 
         RGB32toI420(vs->width, vs->height, (const char *)rgb32, i420);
-        
+
         epoch_c = PR_Now();
         epoch = (PRFloat64)(epoch_c / MICROSECONDS);
         epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;

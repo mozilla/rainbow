@@ -255,7 +255,7 @@ VideoSourceGIPS::DeliverFrame(unsigned char* buffer, int bufferSize)
 {
     nsresult rv;
     PRUint32 wr;
-    
+
     PRTime epoch_c = PR_Now();
     PRFloat64 epoch = (PRFloat64)(epoch_c / MICROSECONDS);
     epoch += ((PRFloat64)(epoch_c % MICROSECONDS)) / MICROSECONDS;
@@ -273,7 +273,7 @@ VideoSourceGIPS::DeliverFrame(unsigned char* buffer, int bufferSize)
             (const char *)buffer, bufferSize, &wr
         );
     }
-    
+
     /* Write preview to canvas, if needed */
     int fsize = width * height * 4;
     if (vCanvas) {

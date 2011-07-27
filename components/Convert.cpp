@@ -101,7 +101,7 @@ I420toRGB32(int width, int height, const char *src, char *dst)
 			*dst_even++ = COMPOSE_RGB(yc1_even, bc, gc, rc);
 			*dst_odd++ = COMPOSE_RGB(yc0_odd, bc, gc, rc);
 			*dst_odd++ = COMPOSE_RGB(yc1_odd, bc, gc, rc);
-			
+
 			++u;
 			++v;
 		}
