@@ -694,18 +694,8 @@ MediaRecorder::BeginSessionThread(void *data)
     Properties *params = mr->params;
 
     /* Setup backends */
-    #ifdef RAINBOW_Mac
-    mr->aState->backend = new AudioSourceMac(params->chan, params->rate);
-    mr->vState->backend = new VideoSourceMac(params->width, params->height);
-    #endif
-    #ifdef RAINBOW_Win
-    mr->aState->backend = new AudioSourceWin(params->chan, params->rate);
-    mr->vState->backend = new VideoSourceWin(params->width, params->height);
-    #endif
-    #ifdef RAINBOW_Nix
     mr->aState->backend = new AudioSourceNix(params->chan, params->rate);
-    mr->vState->backend = new VideoSourceNix(params->width, params->height);
-    #endif
+    mr->vState->backend = new VideoSourceGIPS(params->width, params->height);
  
     /* Is the given canvas source or destination? */
     if (params->canvas) {
@@ -746,6 +736,7 @@ MediaRecorder::BeginSessionThread(void *data)
     /* No preview for audio */
 
     mr->m_session = PR_TRUE;
+    fprintf(stderr, "WAIT A MINUTE>>>>>\n");
     NS_DispatchToMainThread(new MediaCallback(
         mr->observer, "session-began", ""
     ));

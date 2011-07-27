@@ -1,0 +1,58 @@
+<html>
+<head>
+    <title>Rainbow!</title>
+    <script type="application/javascript;version=1.8">
+        let Me = window.navigator.service.media;
+    </script>
+</head>
+<body style="margin:50px 0px;padding:0px;text-align:center;">
+    <h1>Preview Example</h1>
+    <canvas id="tehcanvas" width="640" height="480"></canvas>
+    <p><input type="button" id="tehbutton" value="Start!"/></p>
+    <p id="tehmsg"></p>
+</body>
+<script type="application/javascript;version=1.8">
+    let Re = false;
+    let img = new Image();
+    let msg = document.getElementById("tehmsg");
+    let but = document.getElementById("tehbutton");
+    let ctx = document.getElementById("tehcanvas").getContext("2d");
+
+    img.src = "rainbow.png";
+    img.onload = function() {
+        ctx.drawImage(img, 192, 112);
+    }
+
+    function onStateChange(type, arg) {
+        switch (type) {
+            case "session-began":
+                msg.innerHTML = "Session began!";
+                break;
+            case "session-ended":
+                msg.innerHTML = "Session ended!";
+                break;
+            case "error":
+                msg.innerHTML = "There was an error :( " + type + " :: " + arg;
+                break;
+        }
+    }
+    
+    if (!Me) {
+        msg.innerHTML = "The Rainbow add-on could not be loaded!";
+        but.disabled = true;
+    }
+    
+    but.onclick = function() {
+        if (Re) {
+            // Stop recording
+            Me.endSession();
+        } else {
+            // Start recording
+            Re = true;
+            but.value = "Stop!";
+            msg.innerHTML = "Loading...";
+            Me.beginSession({}, ctx, onStateChange);
+        }
+    }
+</script>
+</html>

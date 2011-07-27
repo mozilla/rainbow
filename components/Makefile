@@ -1,38 +1,13 @@
 # OS
 sys := $(shell uname -s)
 
-ifeq ($(sys), Darwin)
-  os = Darwin
-  compiler = gcc
-  cxx = g++
-  so = dylib
-  teh = Mac
-else
-ifeq ($(sys), MINGW32_NT-5.1)
-  os = WINNT
-  compiler = msvc
-  cxx = cl
-  so = dll
-  teh = Win
-else
-ifeq ($(sys), MINGW32_NT-6.1)
-  os = WINNT
-  compiler = msvc
-  cxx = cl
-  so = dll
-  teh = Win
-else
 ifeq ($(sys), Linux)
   os = Linux
   compiler = gcc
   cxx = g++
   so = so
-  teh = Nix
 else
   $(error Sorry, your os is unknown/unsupported: $(sys))
-endif
-endif
-endif
 endif
 
 # Arch
@@ -63,12 +38,11 @@ so_target = $(target:=.$(so))
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
-    VideoSource.cpp $(os)/VideoSource$(teh).cpp \
-    AudioSource.cpp $(os)/AudioSource$(teh).cpp \
-    VideoSourceCanvas.cpp 
+    VideoSource.cpp AudioSource.cpp $(os)/AudioSourceNix.cpp \
+    VideoSourceGIPS.cpp VideoSourceCanvas.cpp 
 
 sdkdir ?= ${MOZSDKDIR}
-xpidl = $(sdkdir)/bin/xpidl
+rtcdir ?= ${WEBRTCDIR}
 
 # FIXME: we don't actually require this for e.g. clean
 ifeq ($(sdkdir),)
@@ -78,13 +52,20 @@ ifeq ($(sdkdir),)
   $(warning Or set the MOZSDKDIR environment variable to point to it)
   $(error )
 endif
+ifeq ($(rtcdir),)
+  $(warning No 'rtcdir' variable given)
+  $(warning It should point to the location of the WebRTC trunk)
+  $(warning For example: "make rtcdir=/foo/bar/baz")
+  $(warning Or set the WEBRTCDIR environment variable to point to it)
+  $(error )
+endif
+xpidl = $(sdkdir)/bin/xpidl
 
 idl_headers = $(idl:.idl=.h)
 idl_typelib = $(idl:.idl=.xpt)
 cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
-cppflags = -DRAINBOW_$(teh)
 headers = -I. -I$(os) -I$(sdkdir)/include \
     -I$(sdkdir)/include/system_wrappers \
     -I$(sdkdir)/include/xpcom \
@@ -99,71 +80,14 @@ libdirs := $(sdkdir)/lib $(sdkdir)/bin
 libs := xpcomglue_s xpcom nspr4 mozalloc plds4 plc4
 
 # compiler and Linker Flags
-ifeq ($(os), Darwin)
-  libdirs := $(patsubst %,-L%,$(libdirs))
-  libs := $(patsubst %,-l%,$(libs))
-  headers += -I../lib/Darwin_i386-gcc3/include
-
-  ifeq ($(debug),1)
-    cppflags += -g -DDEBUG
-  endif
-
-  cppflags += -c -pipe -Os -arch i386 -dynamiclib \
-    -mmacosx-version-min=10.5 -DMOZ_NO_MOZALLOC -fPIC \
-    -fno-rtti -fno-exceptions -fno-strict-aliasing \
-    -fno-common -fshort-wchar -fpascal-strings -pthread \
-    -Wall -Werror -Wconversion -Wpointer-arith \
-    -Woverloaded-virtual -Wsynth -Wno-ctor-dtor-privacy \
-    -Wno-non-virtual-dtor -Wcast-align -Wno-long-long \
-    -include xpcom-config.h $(headers)
-  ldflags += -pthread -pipe -bundle \
-    -mmacosx-version-min=10.5 -arch i386 \
-    -Wl,-executable_path,$(sdkdir)/bin \
-    -Wl,-dead_strip \
-    ../lib/Darwin_i386-gcc3/libogg.a \
-    ../lib/Darwin_i386-gcc3/libvorbis.a \
-    ../lib/Darwin_i386-gcc3/libvidcap.a \
-    ../lib/Darwin_i386-gcc3/libtheora.a \
-    ../lib/Darwin_i386-gcc3/libtheoraenc.a \
-    ../lib/Darwin_i386-gcc3/libvorbisenc.a \
-    ../lib/Darwin_i386-gcc3/libportaudio.a \
-    -framework Carbon \
-    -framework CoreAudio \
-    -framework QuartzCore \
-    -framework QuickTime \
-    -framework AudioUnit \
-    -framework AudioToolbox \
-    $(libdirs) $(libs)
-else
-ifeq ($(os), WINNT)
-  libdirs := $(patsubst %,-LIBPATH:%,$(libdirs))
-  libs := $(patsubst %,$(sdkdir)/lib/%.lib,$(libs))
-  headers += -I../lib/WINNT_x86-msvc/include
-
-  ifeq ($(debug),1)
-    cppflags += -MTd -DDEBUG
-  else
-    cppflags += -MT
-	ldflags = -NODEFAULTLIB:msvcrt
-  endif
-
-  cppflags += -c -nologo -Zc:wchar_t- $(headers) \
-	-DXP_WIN=1 -DHW_THREADS=1 \
-	-DWIN32_LEAN_AND_MEAN=1 -DMOZ_NO_MOZALLOC=1
-  ldflags += -DLL -NOLOGO -SUBSYSTEM:WINDOWS \
-    -LTCG -MANIFEST $(libdirs) $(libs) \
-    ../lib/WINNT_x86-msvc/libogg.lib \
-    ../lib/WINNT_x86-msvc/libvorbis.lib \
-    ../lib/WINNT_x86-msvc/libtheora.lib \
-	winmm.lib user32.lib advapi32.lib \
-    strmiids.lib ole32.lib oleaut32.lib \
-	user32.lib advapi32.lib winmm.lib $(ldops)
-rcflags := -r $(headers)
-else
 ifeq ($(os), Linux)
+  rtcprefix := $(rtcdir)/out/Debug/obj.target
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
-  headers += -I../lib/Linux_x86-gcc3/include
+  headers += -I../lib/Linux_x86-gcc3/include \
+    -I$(rtcdir)/src \
+    -I$(rtcdir)/src/video_engine/main/interface \
+    -I../lib/$(os)_$(machine)/include
 
   ifeq ($(debug),1)
     cppflags += -g -DDEBUG
@@ -172,23 +96,62 @@ ifeq ($(os), Linux)
   cppflags += -pipe -Os -shared \
     -DMOZ_NO_MOZALLOC -DMOZILLA_STRICT_API -fshort-wchar \
     -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
-    -fno-common -pthread -Wall -Werror -Wconversion \
+    -fno-common -pthread -Wconversion -std=gnu++0x \
     -Wpointer-arith -Woverloaded-virtual -Wsynth \
     -Wno-ctor-dtor-privacy -Wno-non-virtual-dtor -Wcast-align \
     -Wno-long-long -include xpcom-config.h $(headers)
 
-  ldflags += -pthread -pipe -m32 \
+  ldflags += -pthread -pipe \
     -Wl,-z,defs \
     -Wl,-rpath-link,$(sdkdir)/bin \
     $(sdkdir)/lib/libxpcomglue_s.a \
     $(libdirs) $(libs) -lrt -lasound \
-    ../lib/Linux_x86-gcc3/libvidcap.a \
-    ../lib/Linux_x86-gcc3/libvorbis.a \
-    ../lib/Linux_x86-gcc3/libvorbisenc.a \
-    ../lib/Linux_x86-gcc3/libogg.a \
-    ../lib/Linux_x86-gcc3/libtheora.a
-endif
-endif
+    -lXext -lX11 -lpulse -ldl \
+    ../lib/$(os)_$(machine)/libvorbis.a \
+    ../lib/$(os)_$(machine)/libvorbisenc.a \
+    ../lib/$(os)_$(machine)/libogg.a \
+    ../lib/$(os)_$(machine)/libtheora.a
+
+  rtclibs := \
+    src/video_engine/main/source/libvideo_engine_core.a \
+    src/voice_engine/main/source/libvoice_engine_core.a \
+    src/modules/video_render/main/source/libvideo_render_module.a \
+    src/modules/media_file/source/libmedia_file.a \
+    src/modules/video_processing/main/source/libvideo_processing.a \
+    src/modules/video_capture/main/source/libvideo_capture_module.a \
+    src/modules/utility/source/libwebrtc_utility.a \
+    src/modules/video_coding/main/source/libwebrtc_video_coding.a \
+    src/modules/video_coding/codecs/vp8/main/source/libwebrtc_vp8.a \
+    src/common_video/jpeg/main/source/libwebrtc_jpeg.a \
+    third_party/libvpx/libvpx.a \
+    third_party/libjpeg_turbo/libjpeg_turbo.a \
+    src/modules/audio_coding/main/source/libaudio_coding_module.a \
+    src/modules/audio_processing/main/source/libaudio_processing.a \
+    src/modules/audio_device/main/source/libaudio_device.a \
+    src/modules/audio_coding/NetEQ/main/source/libNetEq.a \
+    src/modules/audio_processing/ns/main/source/libns.a \
+    src/modules/audio_processing/aecm/main/source/libaecm.a \
+    src/modules/audio_processing/aec/main/source/libaec.a \
+    src/common_audio/resampler/main/source/libresampler.a \
+    src/modules/audio_coding/codecs/iLBC/main/source/libiLBC.a \
+    src/modules/audio_processing/agc/main/source/libagc.a \
+    src/modules/audio_coding/codecs/CNG/main/source/libCNG.a \
+    src/modules/audio_coding/codecs/iSAC/fix/source/libiSACFix.a \
+    src/modules/audio_coding/codecs/iSAC/main/source/libiSAC.a \
+    src/common_audio/vad/main/source/libvad.a \
+    src/modules/udp_transport/source/libudp_transport.a \
+    src/modules/audio_conference_mixer/source/libaudio_conference_mixer.a \
+    src/modules/rtp_rtcp/source/librtp_rtcp.a \
+    src/modules/video_coding/codecs/i420/main/source/libwebrtc_i420.a \
+    src/common_video/vplib/main/source/libwebrtc_vplib.a \
+    src/modules/audio_coding/codecs/G711/main/source/libG711.a \
+    src/modules/audio_processing/utility/libapm_util.a \
+    src/common_audio/signal_processing_library/main/source/libspl.a \
+    src/modules/audio_coding/codecs/G722/main/source/libG722.a \
+    src/modules/audio_coding/codecs/PCM16B/main/source/libPCM16B.a \
+    src/system_wrappers/source/libsystem_wrappers.a
+
+  ldflags += $(patsubst %,$(rtcprefix)/%,$(rtclibs))
 endif
 
 ######################################################################
@@ -202,7 +165,7 @@ build: $(so_target) $(idl_typelib)
 clean:
 	rm -f $(so_target) $(so_target).manifest $(cpp_objects) \
 	$(target:=.res) libmediarecorder.lib libmediarecorder.exp \
-	$(target).pdb $(target).ilk
+	IMediaRecorder.h IMediaRecorder.xpt $(target).pdb $(target).ilk
 
 # rules to build the c headers and .xpt from idl
 $(idl_headers): $(idl)
@@ -211,28 +174,8 @@ $(idl_headers): $(idl)
 $(idl_typelib): $(idl)
 	$(xpidl) -m typelib -I$(sdkdir)/idl $(@:.xpt=.idl)
 
-
-ifeq ($(os), Darwin)
-  $(cpp_objects): $(cpp_sources)
-	$(cxx) -o $@ $(cppflags) $(@:.o=.cpp)
-
-  $(so_target): $(idl_headers) $(cpp_objects)
-	$(cxx) -o $@ $(ldflags) $(cpp_objects)
-	chmod +x $@
-else
-ifeq ($(os), WINNT)
-  $(cpp_objects): $(cpp_sources)
-	$(cxx) -Fo$@ -Fd$(@:.o=.pdb) $(cppflags) $(@:.o=.cpp)
-
-  $(so_target): $(idl_headers) $(cpp_objects)
-	link -OUT:$@ -PDB:$(@:.dll=.pdb) $(cpp_objects) $(ldflags)
-	mt.exe -manifest $(so_target).manifest -outputresource:"$@;2"
-	chmod +x $@
-else
 ifeq ($(os), Linux)
   $(so_target): $(idl_headers)
 	$(cxx) $(cppflags) -o $@ $(cpp_sources) $(ldflags)
 	chmod +x $@
-endif
-endif
 endif

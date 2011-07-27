@@ -58,21 +58,9 @@
 #include <nsStringAPI.h>
 #include <nsComponentManagerUtils.h>
 
-/* ifdefs are evil, but I am powerless. This is better than factory classes! */
-#ifdef RAINBOW_Mac
-#include "VideoSourceMac.h"
-#include "AudioSourceMac.h"
-#endif
-#ifdef RAINBOW_Win
-#include "VideoSourceWin.h"
-#include "AudioSourceWin.h"
-#endif
-#ifdef RAINBOW_Nix
-#include "VideoSourceNix.h"
-#include "AudioSourceNix.h"
-#endif
-
+#include "VideoSourceGIPS.h"
 #include "VideoSourceCanvas.h"
+#include "AudioSourceNix.h"
 
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"
