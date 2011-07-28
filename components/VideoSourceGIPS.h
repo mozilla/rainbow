@@ -50,7 +50,7 @@ public:
 
     nsresult Stop();
     nsresult Start(nsIDOMCanvasRenderingContext2D *ctx);
-    
+
 protected:
     int videoChannel;
     int gipsCaptureId;
@@ -66,5 +66,5 @@ protected:
     int FrameSizeChange(
         unsigned int width, unsigned int height, unsigned int numberOfStreams
     );
-    int DeliverFrame(unsigned char* buffer, int bufferSize);   
+    int DeliverFrame(unsigned char* buffer, int bufferSize);
 };

@@ -53,6 +53,6 @@ protected:
     PRThread *sampler;
     nsIDOMCanvasRenderingContext2D *vCanvas;
     static void Grabber(void * data);
-        
+
 };
 

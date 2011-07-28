@@ -54,7 +54,7 @@ protected:
     PRBool rec, g2g;
     snd_pcm_t *device;
     snd_pcm_hw_params_t *params;
-    
+
     PRThread *capture;
     nsIOutputStream *output;
     static void CaptureThread(void *data);

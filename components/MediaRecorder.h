@@ -94,7 +94,7 @@ typedef struct {
     th_comment tc;
     th_enc_ctx *th;
     ogg_stream_state os;
-    
+
     VideoSource *backend;
     nsCOMPtr<nsIAsyncInputStream> vPipeIn;
     nsCOMPtr<nsIAsyncOutputStream> vPipeOut;
@@ -128,12 +128,12 @@ protected:
     PRBool a_rec, v_rec;
     PRLogModuleInfo *log;
     nsIDOMCanvasRenderingContext2D *canvas;
-    
+
     nsCOMPtr<nsIOutputStream> pipeStream;
     nsCOMPtr<nsIAsyncInputStream> sockIn;
     nsCOMPtr<nsIAsyncOutputStream> sockOut;
     nsCOMPtr<nsIMediaStateObserver> observer;
-    
+
     static MediaRecorder *gMediaRecordingService;
 
     static void BeginSessionThread(void *data);
@@ -144,14 +144,14 @@ protected:
     nsresult SetupVorbisBOS();
     nsresult SetupTheoraHeaders();
     nsresult SetupVorbisHeaders();
-    
+
     void Encode();
     void WriteAudio();
     PRBool EncodeVideo(PRUint8 *v_frame, int len);
     PRBool EncodeAudio(PRInt16 *a_frames, int len);
     PRUint8 * GetVideoPacket(PRInt32 *len, PRFloat64 *times);
     PRInt16 * GetAudioPacket(PRInt32 len);
-    
+
     void ParseProperties(nsIPropertyBag2 *prop);
     nsresult WriteData(unsigned char *data, PRUint32 len, PRUint32 *wr);
     nsresult MakePipe(nsIAsyncInputStream **in, nsIAsyncOutputStream **out);
