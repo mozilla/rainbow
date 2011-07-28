@@ -35,29 +35,24 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "AudioSource.h"
-#include <prmem.h>
-#include <prthread.h>
-#include <alsa/asoundlib.h>
+#include <portaudio.h>
 
-/* Hopefully this is the default capture device */
-#define ADDR "hw:0,0"
-
-class AudioSourceNix : public AudioSource {
+class AudioSourceDarwin : public AudioSource {
 public:
-    AudioSourceNix(int c, int r);
-    ~AudioSourceNix();
+    AudioSourceDarwin(int c, int r);
+    ~AudioSourceDarwin();
 
     nsresult Stop();
     nsresult Start(nsIOutputStream *pipe);
 
 protected:
-    PRBool rec, g2g;
-    snd_pcm_t *device;
-    snd_pcm_hw_params_t *params;
-    
-    PRThread *capture;
+    PaStream *stream;
+    PaDeviceIndex source;
     nsIOutputStream *output;
-    static void CaptureThread(void *data);
 
+    static int Callback(
+        const void *input, void *output, unsigned long frames,
+        const PaStreamCallbackTimeInfo* time,
+        PaStreamCallbackFlags flags, void *data
+    );
 };
-

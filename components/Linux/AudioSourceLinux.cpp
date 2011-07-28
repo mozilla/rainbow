@@ -34,9 +34,9 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include "AudioSourceNix.h"
+#include "AudioSourceLinux.h"
 
-AudioSourceNix::AudioSourceNix(int c, int r)
+AudioSourceLinux::AudioSourceLinux(int c, int r)
     : AudioSource(c, r)
 {
     int err;
@@ -91,13 +91,13 @@ AudioSourceNix::AudioSourceNix(int c, int r)
     snd_pcm_close(device);
 }
 
-AudioSourceNix::~AudioSourceNix()
+AudioSourceLinux::~AudioSourceLinux()
 {
     snd_pcm_hw_params_free(params);
 }
 
 nsresult
-AudioSourceNix::Start(nsIOutputStream *pipe)
+AudioSourceLinux::Start(nsIOutputStream *pipe)
 {
     int err;
     output = pipe;
@@ -112,7 +112,7 @@ AudioSourceNix::Start(nsIOutputStream *pipe)
 
     rec = PR_TRUE;
     capture = PR_CreateThread(
-        PR_SYSTEM_THREAD, AudioSourceNix::CaptureThread, this,
+        PR_SYSTEM_THREAD, AudioSourceLinux::CaptureThread, this,
         PR_PRIORITY_HIGH, PR_GLOBAL_THREAD, PR_JOINABLE_THREAD, 0
     );
 
@@ -120,7 +120,7 @@ AudioSourceNix::Start(nsIOutputStream *pipe)
 }
 
 nsresult
-AudioSourceNix::Stop()
+AudioSourceLinux::Stop()
 {
     rec = PR_FALSE;
     PR_JoinThread(capture);
@@ -130,7 +130,7 @@ AudioSourceNix::Stop()
 }
 
 void
-AudioSourceNix::CaptureThread(void *data)
+AudioSourceLinux::CaptureThread(void *data)
 {
     int err;
     nsresult rv;
@@ -138,7 +138,7 @@ AudioSourceNix::CaptureThread(void *data)
     SAMPLE *buffer;
     int frames_read;
     signed short *ptr;
-    AudioSourceNix *asn = static_cast<AudioSourceNix*>(data);
+    AudioSourceLinux *asn = static_cast<AudioSourceLinux*>(data);
 
     buffer = (short *)PR_Calloc(asn->GetFrameSize(), FRAMES_BUFFER);
     while (asn->rec) {

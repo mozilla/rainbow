@@ -33,38 +33,31 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-#include "VideoSource.h"
 
-#include <stdio.h>
+#include "AudioSource.h"
 #include <prmem.h>
-#include <vie_base.h>
-#include <vie_codec.h>
-#include <vie_render.h>
-#include <vie_capture.h>
-#include <common_types.h>
+#include <prthread.h>
+#include <alsa/asoundlib.h>
 
-class VideoSourceGIPS : public VideoSource, public webrtc::ExternalRenderer {
+/* Hopefully this is the default capture device */
+#define ADDR "hw:0,0"
+
+class AudioSourceLinux : public AudioSource {
 public:
-    VideoSourceGIPS(int w, int h);
-    ~VideoSourceGIPS();
+    AudioSourceLinux(int c, int r);
+    ~AudioSourceLinux();
 
     nsresult Stop();
-    nsresult Start(nsIDOMCanvasRenderingContext2D *ctx);
-    
+    nsresult Start(nsIOutputStream *pipe);
+
 protected:
-    int videoChannel;
-    int gipsCaptureId;
-    webrtc::VideoEngine* ptrViE;
-    webrtc::ViEBase* ptrViEBase;
-    webrtc::ViECapture* ptrViECapture;
-    webrtc::ViERender* ptrViERender;
-    webrtc::CaptureCapability cap;
+    PRBool rec, g2g;
+    snd_pcm_t *device;
+    snd_pcm_hw_params_t *params;
+    
+    PRThread *capture;
+    nsIOutputStream *output;
+    static void CaptureThread(void *data);
 
-    nsIDOMCanvasRenderingContext2D *vCanvas;
-
-    // GIPSViEExternalRenderer
-    int FrameSizeChange(
-        unsigned int width, unsigned int height, unsigned int numberOfStreams
-    );
-    int DeliverFrame(unsigned char* buffer, int bufferSize);   
 };
+

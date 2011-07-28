@@ -1,18 +1,8 @@
 # OS
 sys := $(shell uname -s)
 
-ifeq ($(sys), Linux)
-  os = Linux
-  compiler = gcc
-  cxx = g++
-  so = so
-else
-  $(error Sorry, your os is unknown/unsupported: $(sys))
-endif
-
 # Arch
 machine := $(shell uname -m)
-
 ifeq ($(machine), i386)
   arch = x86
 else
@@ -31,6 +21,24 @@ endif
 endif
 endif
 
+
+ifeq ($(sys), Darwin)
+  os = Darwin
+  compiler = gcc
+  cxx = g++
+  so = dylib
+  machine = i386
+else
+ifeq ($(sys), Linux)
+  os = Linux
+  compiler = gcc
+  cxx = g++
+  so = so
+else
+  $(error Sorry, your os is unknown/unsupported: $(sys))
+endif
+endif
+
 # Target and objects
 target = libmediarecorder
 so_target = $(target:=.$(so))
@@ -38,7 +46,7 @@ so_target = $(target:=.$(so))
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
-    VideoSource.cpp AudioSource.cpp $(os)/AudioSourceNix.cpp \
+    VideoSource.cpp AudioSource.cpp $(os)/AudioSource$(os).cpp \
     VideoSourceGIPS.cpp VideoSourceCanvas.cpp 
 
 sdkdir ?= ${MOZSDKDIR}
@@ -66,6 +74,7 @@ idl_typelib = $(idl:.idl=.xpt)
 cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
+cppflags = -DOS_$(os)
 headers = -I. -I$(os) -I$(sdkdir)/include \
     -I$(sdkdir)/include/system_wrappers \
     -I$(sdkdir)/include/xpcom \
@@ -73,28 +82,80 @@ headers = -I. -I$(os) -I$(sdkdir)/include \
     -I$(sdkdir)/include/content \
     -I$(sdkdir)/include/dom \
     -I$(sdkdir)/include/nspr \
-    -I$(sdkdir)/sdk/include
+    -I$(sdkdir)/sdk/include \
+    -I../lib/$(os)_$(machine)/include \
+    -I$(rtcdir)/src \
+    -I$(rtcdir)/src/video_engine/main/interface
 
 # libraries
 libdirs := $(sdkdir)/lib $(sdkdir)/bin
 libs := xpcomglue_s xpcom nspr4 mozalloc plds4 plc4
 
 # compiler and Linker Flags
+ifeq ($(os), Darwin)
+  rtcprefix := $(rtcdir)/xcodebuild/Debug
+  libdirs := $(patsubst %,-L%,$(libdirs))
+  libs := $(patsubst %,-l%,$(libs))
+
+  cppflags += -c -pipe -Os -arch i386 -dynamiclib \
+    -g -DDEBUG -mmacosx-version-min=10.5 \
+    -DMOZ_NO_MOZALLOC -fPIC -fno-rtti -fno-exceptions \
+    -fno-strict-aliasing -fno-common -fshort-wchar \
+    -fpascal-strings -pthread \
+    -Wall -Werror -Wconversion -Wpointer-arith \
+    -Wno-invalid-offsetof \
+    -Woverloaded-virtual -Wsynth -Wno-ctor-dtor-privacy \
+    -Wno-non-virtual-dtor -Wcast-align -Wno-long-long \
+    -include xpcom-config.h $(headers)
+
+  ldflags += -pthread -pipe -bundle \
+    -mmacosx-version-min=10.5 -arch i386 \
+    -Wl,-executable_path,$(sdkdir)/bin \
+    -Wl,-dead_strip \
+    $(sdkdir)/lib/XUL \
+    ../lib/$(os)_$(machine)/libogg.a \
+    ../lib/$(os)_$(machine)/libvorbis.a \
+    ../lib/$(os)_$(machine)/libtheora.a \
+    ../lib/$(os)_$(machine)/libtheoraenc.a \
+    ../lib/$(os)_$(machine)/libvorbisenc.a \
+    ../lib/$(os)_$(machine)/libportaudio.a \
+    -framework AppKit \
+    -framework AudioToolbox \
+    -framework AudioUnit \
+    -framework CoreAudio \
+    -framework CoreData \
+    -framework CoreFoundation \
+    -framework CoreVideo \
+    -framework Foundation \
+    -framework QTKit \
+    -framework OpenGL \
+    -framework QuartzCore \
+    -framework Cocoa \
+    $(libdirs) $(libs)
+
+  rtclibs := libaec.a libaecm.a libagc.a libapm_util.a \
+    libaudio_coding_module.a libaudio_conference_mixer.a \
+    libaudio_device.a libaudio_processing.a libCNG.a \
+    libG711.a libG722.a libgenperf_libs.a libiLBC.a \
+    libiSAC.a libiSACFix.a libjpeg_turbo.a libmedia_file.a \
+    libNetEq.a libns.a libPCM16B.a libresampler.a \
+    librtp_rtcp.a libspl.a libsystem_wrappers.a \
+    libudp_transport.a libvad.a libvideo_capture_module.a \
+    libvideo_engine_core.a libvideo_processing.a \
+    libvideo_render_module.a libvoice_engine_core.a libvpx.a \
+    libwebrtc_i420.a libwebrtc_jpeg.a libwebrtc_utility.a \
+    libwebrtc_video_coding.a libwebrtc_vp8.a libwebrtc_vplib.a
+
+  ldflags += $(patsubst %,$(rtcprefix)/%,$(rtclibs))
+else
 ifeq ($(os), Linux)
   rtcprefix := $(rtcdir)/out/Debug/obj.target
   libdirs := $(patsubst %,-L%,$(libdirs))
   libs := $(patsubst %,-l%,$(libs))
-  headers += -I../lib/Linux_x86-gcc3/include \
-    -I$(rtcdir)/src \
-    -I$(rtcdir)/src/video_engine/main/interface \
-    -I../lib/$(os)_$(machine)/include
-
-  ifeq ($(debug),1)
-    cppflags += -g -DDEBUG
-  endif
 
   cppflags += -pipe -Os -shared \
     -DMOZ_NO_MOZALLOC -DMOZILLA_STRICT_API -fshort-wchar \
+    -g -DDEBUG \
     -fPIC -fno-rtti -fno-exceptions -fno-strict-aliasing \
     -fno-common -pthread -Wconversion -std=gnu++0x \
     -Wpointer-arith -Woverloaded-virtual -Wsynth \
@@ -153,6 +214,7 @@ ifeq ($(os), Linux)
 
   ldflags += $(patsubst %,$(rtcprefix)/%,$(rtclibs))
 endif
+endif
 
 ######################################################################
 
@@ -174,8 +236,17 @@ $(idl_headers): $(idl)
 $(idl_typelib): $(idl)
 	$(xpidl) -m typelib -I$(sdkdir)/idl $(@:.xpt=.idl)
 
+ifeq ($(os), Darwin)
+  $(cpp_objects): $(cpp_sources)
+	$(cxx) -o $@ $(cppflags) $(@:.o=.cpp)
+
+  $(so_target): $(idl_headers) $(cpp_objects)
+	$(cxx) -o $@ $(ldflags) $(cpp_objects)
+	chmod +x $@
+else
 ifeq ($(os), Linux)
   $(so_target): $(idl_headers)
 	$(cxx) $(cppflags) -o $@ $(cpp_sources) $(ldflags)
 	chmod +x $@
+endif
 endif

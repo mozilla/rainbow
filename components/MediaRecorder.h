@@ -60,7 +60,13 @@
 
 #include "VideoSourceGIPS.h"
 #include "VideoSourceCanvas.h"
-#include "AudioSourceNix.h"
+
+#ifdef OS_Darwin
+#include "AudioSourceDarwin.h"
+#endif
+#ifdef OS_Linux
+#include "AudioSourceLinux.h"
+#endif
 
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"

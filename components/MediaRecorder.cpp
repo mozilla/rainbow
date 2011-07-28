@@ -71,6 +71,7 @@ public:
     }
     
     NS_IMETHOD Run() {
+        fprintf(stderr, "Going to call STATECHANGE\n");
         return m_Obs->OnStateChange((char *)m_Msg, (char *)m_Arg);
     }
     
@@ -694,7 +695,12 @@ MediaRecorder::BeginSessionThread(void *data)
     Properties *params = mr->params;
 
     /* Setup backends */
-    mr->aState->backend = new AudioSourceNix(params->chan, params->rate);
+    #ifdef OS_Darwin
+    mr->aState->backend = new AudioSourceDarwin(params->chan, params->rate);
+    #endif
+    #ifdef OS_Linux
+    mr->aState->backend = new AudioSourceLinux(params->chan, params->rate);
+    #endif
     mr->vState->backend = new VideoSourceGIPS(params->width, params->height);
  
     /* Is the given canvas source or destination? */
@@ -735,11 +741,15 @@ MediaRecorder::BeginSessionThread(void *data)
     }
     /* No preview for audio */
 
+    fprintf(stderr, "Going to dipatch session-began!\n");
     mr->m_session = PR_TRUE;
-    fprintf(stderr, "WAIT A MINUTE>>>>>\n");
-    NS_DispatchToMainThread(new MediaCallback(
+    nsRefPtr<MediaCallback> cb = new MediaCallback(
         mr->observer, "session-began", ""
-    ));
+    );
+    rv = NS_DispatchToMainThread(cb);
+    if (NS_FAILED(rv)) {
+        fprintf(stderr, "OH NO IT FAILED WITH : %X\n", rv);
+    }
     return;
 }
 
