@@ -21,7 +21,6 @@ endif
 endif
 endif
 
-
 ifeq ($(sys), Darwin)
   os = Darwin
   compiler = gcc
@@ -46,8 +45,9 @@ so_target = $(target:=.$(so))
 # source and path configurations
 idl = IMediaRecorder.idl
 cpp_sources = MediaRecorder.cpp MediaModule.cpp Convert.cpp \
-    VideoSource.cpp AudioSource.cpp $(os)/AudioSource$(os).cpp \
-    VideoSourceGIPS.cpp VideoSourceCanvas.cpp 
+    VideoSource.cpp AudioSource.cpp \
+    VideoSourceGIPS.cpp AudioSourceGIPS.cpp \
+    VideoSourceCanvas.cpp
 
 sdkdir ?= ${MOZSDKDIR}
 rtcdir ?= ${WEBRTCDIR}
@@ -74,7 +74,6 @@ idl_typelib = $(idl:.idl=.xpt)
 cpp_objects = $(cpp_sources:.cpp=.o)
 so_target = $(target:=.$(so))
 
-cppflags = -DOS_$(os)
 headers = -I. -I$(os) -I$(sdkdir)/include \
     -I$(sdkdir)/include/system_wrappers \
     -I$(sdkdir)/include/xpcom \
@@ -85,7 +84,8 @@ headers = -I. -I$(os) -I$(sdkdir)/include \
     -I$(sdkdir)/sdk/include \
     -I../lib/$(os)_$(machine)/include \
     -I$(rtcdir)/src \
-    -I$(rtcdir)/src/video_engine/main/interface
+    -I$(rtcdir)/src/video_engine/main/interface \
+    -I$(rtcdir)/src/voice_engine/main/interface
 
 # libraries
 libdirs := $(sdkdir)/lib $(sdkdir)/bin

@@ -695,13 +695,10 @@ MediaRecorder::BeginSessionThread(void *data)
     Properties *params = mr->params;
 
     /* Setup backends */
-    #ifdef OS_Darwin
-    mr->aState->backend = new AudioSourceDarwin(params->chan, params->rate);
-    #endif
-    #ifdef OS_Linux
-    mr->aState->backend = new AudioSourceLinux(params->chan, params->rate);
-    #endif
-    mr->vState->backend = new VideoSourceGIPS(params->width, params->height);
+    if (params->audio)
+        mr->aState->backend = new AudioSourceGIPS(params->chan, params->rate);
+    if (params->video)
+        mr->vState->backend = new VideoSourceGIPS(params->width, params->height);
 
     /* Is the given canvas source or destination? */
     if (params->canvas) {

@@ -58,15 +58,9 @@
 #include <nsStringAPI.h>
 #include <nsComponentManagerUtils.h>
 
+#include "AudioSourceGIPS.h"
 #include "VideoSourceGIPS.h"
 #include "VideoSourceCanvas.h"
-
-#ifdef OS_Darwin
-#include "AudioSourceDarwin.h"
-#endif
-#ifdef OS_Linux
-#include "AudioSourceLinux.h"
-#endif
 
 #define SOCK_LEN 8192
 #define MEDIA_RECORDER_CONTRACTID "@labs.mozilla.com/media/recorder;1"

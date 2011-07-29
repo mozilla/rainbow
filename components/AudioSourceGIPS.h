@@ -18,6 +18,7 @@
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
+ *   Ralph Giles <giles@mozilla.com>
  *   Anant Narayanan <anant@kix.in>
  *
  * Alternatively, the contents of this file may be used under the terms of
@@ -35,24 +36,31 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "AudioSource.h"
-#include <portaudio.h>
 
-class AudioSourceDarwin : public AudioSource {
+#include <voe_base.h>
+#include <voe_hardware.h>
+#include <voe_external_media.h>
+#include <common_types.h>
+
+class AudioSourceGIPS : public AudioSource, public webrtc::VoEMediaProcess {
 public:
-    AudioSourceDarwin(int c, int r);
-    ~AudioSourceDarwin();
+    AudioSourceGIPS(int, int);
+    ~AudioSourceGIPS();
 
     nsresult Stop();
     nsresult Start(nsIOutputStream *pipe);
 
 protected:
-    PaStream *stream;
-    PaDeviceIndex source;
-    nsIOutputStream *output;
+    int channel;
+    webrtc::CodecInst codec;
+    webrtc::VoiceEngine* ptrVoE;
+    webrtc::VoEBase* ptrVoEBase;
+    webrtc::VoEHardware *ptrVoEHardware;
+    webrtc::VoEExternalMedia* ptrVoERender;
 
-    static int Callback(
-        const void *input, void *output, unsigned long frames,
-        const PaStreamCallbackTimeInfo* time,
-        PaStreamCallbackFlags flags, void *data
-    );
+    nsIOutputStream *output;
+    void Process(const int channel,
+                 const webrtc::ProcessingTypes type,
+                 WebRtc_Word16 audio10ms[], const int length,
+                 const int samplingFreq, const bool isStereo);
 };
