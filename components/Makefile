@@ -139,7 +139,7 @@ ifeq ($(os), Darwin)
     libG711.a libG722.a libgenperf_libs.a libiLBC.a \
     libiSAC.a libiSACFix.a libjpeg_turbo.a libmedia_file.a \
     libNetEq.a libns.a libPCM16B.a libresampler.a \
-    librtp_rtcp.a libspl.a libsystem_wrappers.a \
+    librtp_rtcp.a libspl.a libprotobuf_lite.a libsystem_wrappers.a \
     libudp_transport.a libvad.a libvideo_capture_module.a \
     libvideo_engine_core.a libvideo_processing.a \
     libvideo_render_module.a libvoice_engine_core.a libvpx.a \
@@ -210,6 +210,7 @@ ifeq ($(os), Linux)
     src/common_audio/signal_processing_library/main/source/libspl.a \
     src/modules/audio_coding/codecs/G722/main/source/libG722.a \
     src/modules/audio_coding/codecs/PCM16B/main/source/libPCM16B.a \
+    third_party/protobuf/libprotobuf_lite.a \
     src/system_wrappers/source/libsystem_wrappers.a
 
   ldflags += $(patsubst %,$(rtcprefix)/%,$(rtclibs))
