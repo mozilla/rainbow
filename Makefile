@@ -2,21 +2,17 @@ ifeq ($(TOPSRCDIR),)
   export TOPSRCDIR = $(shell pwd)
 endif
 ifeq ($(VERSION),)
-  export VERSION = 0.4
+  export VERSION = 0.5
 endif
 
 sys := $(shell uname -s)
 ifeq ($(sys), Darwin)
   so = dylib
 else
-ifeq ($(sys), MINGW32_NT-5.1)
+ifeq ($(sys), MINGW32_NT-6.1)
   so = dll
 else
-ifeq ($(sys), Linux)
-  so = so
-else
   $(error Sorry, your os is unknown/unsupported: $(sys))
-endif
 endif
 endif
 
